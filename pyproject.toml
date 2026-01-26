@@ -1,0 +1,50 @@
+[project]
+name = "hilo-eda"
+version = "0.1.0"
+description = "Human-in-the-loop agentic EDA for Snowflake"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Codex" }]
+dependencies = [
+    "typer>=0.12.3",
+    "rich>=13.7.1",
+    "snowflake-connector-python>=3.6.0",
+    "pandas>=2.2.2",
+    "pydantic>=2.8.2",
+    "claude-agent-sdk>=0.1.0",
+    "langchain>=0.2.6",
+    "langgraph>=0.1.14",
+    "crewai>=0.70.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2.0",
+    "ruff>=0.5.0",
+    "black>=24.4.2",
+]
+
+[project.scripts]
+hilo-eda = "hilo_eda.cli:app"
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.black]
+line-length = 88
+
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 88
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
