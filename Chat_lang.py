@@ -2,14 +2,16 @@ import os
 import asyncio
 import logging
 from pathlib import Path
-from typing import List, Optional, Dict, Any
-
-from langchain.agents import create_agent
-from langchain_anthropic import ChatAnthropic
-from langchain_mcp_adapters.client import MultiServerMCPClient
+from typing import List, Optional
 
 from src.agent.config import AgentConfig
 from src.agent.mcp_manager import MCPManager
+
+from langchain.agents import create_agent  # LangChain v1 API
+from langchain_mcp_adapters.client import MultiServerMCPClient
+
+# Choose ONE model provider:
+from langchain_anthropic import ChatAnthropic  # if you're using Anthropic
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -20,43 +22,77 @@ class SkillsAgentLangChain:
         self.verbose = verbose
         self.config = AgentConfig.from_env()
 
-        # MCP STDIO config like:
-        # {"confluence": {"transport":"stdio","command":"python","args":["-m","mcp_servers.tools.confluence_tools"]}}
+        # MCP client config: {"confluence": {"transport": "stdio", "command": "...", "args": [...]}, ...}
         self.mcp_client_config = MCPManager.get_langchain_mcp_client_config(self.config)
 
-        # Load skills (optional)
+        # Load skills text from .claude/skills/**/SKILL.md
         self.skills_text = self._load_skills_text()
+
+        # Build system prompt (your “skills-first” behavior)
         self.system_prompt = self._build_system_prompt()
 
-        # 1) Connect MCP client (stdio)
+        self.mcp_client: Optional[MultiServerMCPClient] = None
+        self.tools = []
+        self.agent = None
+
+        logger.info(MCPManager.format_server_status(self.config))
+
+    async def init_async(self):
+        # 1) Connect MCP tools (stdio)
         self.mcp_client = MultiServerMCPClient(self.mcp_client_config)
+        self.tools = await self.mcp_client.get_tools()
+        logger.info("Loaded %s MCP tools", len(self.tools))
 
-        # IMPORTANT: tools load is async in adapter → run it once here
-        self.tools = asyncio.run(self.mcp_client.get_tools())
-        logger.info("Loaded %d MCP tools", len(self.tools))
-
-        # 2) Model
-        self.model = ChatAnthropic(
+        # 2) Create model instance (recommended approach in v1 docs)
+        model = ChatAnthropic(
             model=os.getenv("LC_MODEL", "claude-3-5-sonnet-latest"),
             temperature=float(os.getenv("LC_TEMPERATURE", "0.2")),
         )
 
-        # 3) Agent (LangChain v1)
-        # create_agent returns an “agent graph / runnable” that you call with .invoke(...) 0
+        # 3) Build agent (LangChain v1)
+        # create_agent runs a loop internally: model -> tools -> model ... until done
         self.agent = create_agent(
-            model=self.model,
+            model=model,
             tools=self.tools,
             system_prompt=self.system_prompt,
         )
 
+    def get_welcome_message(self) -> str:
+        enabled = MCPManager.get_enabled_server_names(self.config)
+
+        services = []
+        if "confluence" in enabled:
+            services.append("✅ Confluence - Search, create, update, manage documentation")
+        if "servicenow" in enabled:
+            services.append("✅ ServiceNow - Search and manage tickets")
+
+        services_text = "\n".join(services) if services else "⚠️  No services configured"
+
+        return f"""
+================================================
+🤖 Multi-Service AI Assistant (LangChain v1 + MCP)
+================================================
+{MCPManager.format_server_status(self.config)}
+
+Available Services:
+{services_text}
+
+How it works:
+- Skills loaded from .claude/skills/**/SKILL.md (project-local)
+- MCP tools connected over STDIO
+- Type 'quit' or 'exit' to end
+================================================
+""".strip()
+
+    async def chat(self):
         if self.agent is None:
-            raise RuntimeError("create_agent returned None. Check your LangChain install / imports.")
+            await self.init_async()
 
-        logger.info(MCPManager.format_server_status(self.config))
-
-    def chat(self):
         print(self.get_welcome_message())
-        messages: List[Dict[str, Any]] = []
+
+        # LangChain v1 agents use a state with "messages"
+        # We'll keep a running chat history.
+        messages: List[dict] = []
 
         while True:
             try:
@@ -67,15 +103,19 @@ class SkillsAgentLangChain:
                     print("\nGoodbye! 👋")
                     break
 
-                # v1 agent state expects messages in state update 1
                 messages.append({"role": "user", "content": user_input})
 
-                result = self.agent.invoke({"messages": messages})  # SYNC invoke
-                messages = result.get("messages", messages)
+                # Invoke agent
+                result = self.agent.invoke({"messages": messages})
 
+                # result is typically a dict with updated state
+                # In v1 docs, the agent is graph-based and returns state including messages. 1
+                updated_messages = result.get("messages", [])
+                messages = updated_messages if updated_messages else messages
+
+                # Print last assistant message (if present)
                 assistant_text = self._extract_last_assistant_text(messages) or ""
                 if self._is_skill_content(assistant_text):
-                    # optional: don’t print the huge skill md blob
                     assistant_text = "(Skill content omitted)"
 
                 print("\nAssistant:", assistant_text, "\n")
@@ -87,62 +127,14 @@ class SkillsAgentLangChain:
                 logger.exception("Error in chat loop")
                 print(f"\n❌ Error: {e}\n")
 
-    def get_welcome_message(self) -> str:
-        enabled = []
-        try:
-            enabled = MCPManager.get_enabled_server_names(self.config)
-        except Exception:
-            enabled = list(self.mcp_client_config.keys())
-
-        services = []
-        if "confluence" in enabled:
-            services.append("✅ Confluence - Search, create, update and manage documentation")
-        if "servicenow" in enabled:
-            services.append("✅ ServiceNow - Search and manage tickets")
-
-        return (
-            "=============================================\n"
-            "🤖 Multi-Service AI Assistant (LangChain v1)\n"
-            "=============================================\n"
-            f"{MCPManager.format_server_status(self.config)}\n\n"
-            "Available Services:\n"
-            + ("\n".join(services) if services else "⚠️  No services configured")
-            + "\n\n💡 How it works:\n"
-            "- Skills are loaded from .claude/skills/**/SKILL.md (project-local)\n"
-            "- MCP tools are connected over STDIO and called by the agent\n"
-            "- Type 'quit' or 'exit' to end the conversation\n"
-            "---------------------------------------------\n"
-        )
-
-    def _build_system_prompt(self) -> str:
-        base = (
-            "You are an AI assistant with access to MCP tools.\n"
-            "Follow SKILL instructions when present, then use tools.\n"
-        )
-        if self.skills_text:
-            base += "\n=== SKILLS ===\n" + self.skills_text + "\n"
-        return base
-
-    def _load_skills_text(self) -> str:
-        skills_dir = Path(os.getcwd()) / ".claude" / "skills"
-        if not skills_dir.exists():
-            return ""
-        parts = []
-        for p in skills_dir.glob("**/SKILL.md"):
-            try:
-                parts.append(f"\n---\n# {p.parent.name}\n{p.read_text(encoding='utf-8', errors='ignore')}\n")
-            except Exception:
-                pass
-        return "\n".join(parts).strip()
-
-    def _extract_last_assistant_text(self, messages: List[Dict[str, Any]]) -> Optional[str]:
+    def _extract_last_assistant_text(self, messages: List[dict]) -> Optional[str]:
         for m in reversed(messages):
             if m.get("role") == "assistant":
                 c = m.get("content")
                 if isinstance(c, str):
                     return c
+                # Some providers use content blocks; try best-effort flatten
                 if isinstance(c, list):
-                    # best-effort flatten
                     texts = []
                     for blk in c:
                         if isinstance(blk, dict) and "text" in blk:
@@ -150,17 +142,51 @@ class SkillsAgentLangChain:
                     return "\n".join(texts).strip() if texts else None
         return None
 
+    def _build_system_prompt(self) -> str:
+        base = (
+            "You are an AI assistant with access to multiple services through MCP tools.\n\n"
+            "CRITICAL WORKFLOW REQUIREMENT:\n"
+            "When the user asks about a service (Confluence/ServiceNow/etc), FIRST follow the relevant SKILL instructions below.\n"
+            "Then call MCP tools as required and provide the final answer.\n\n"
+        )
+        if self.skills_text:
+            base += "=== SKILLS (Project) ===\n" + self.skills_text + "\n\n"
+        return base
+
+    def _load_skills_text(self) -> str:
+        root = Path(os.getcwd())
+        skills_dir = root / ".claude" / "skills"
+        if not skills_dir.exists():
+            return ""
+
+        parts: List[str] = []
+        for skill_md in skills_dir.glob("**/SKILL.md"):
+            try:
+                text = skill_md.read_text(encoding="utf-8", errors="ignore")
+                skill_name = skill_md.parent.name
+                parts.append(f"\n---\n# Skill: {skill_name}\n{text}\n")
+            except Exception as e:
+                logger.warning("Failed reading %s: %s", skill_md, e)
+
+        return "\n".join(parts).strip()
+
     def _is_skill_content(self, text: str) -> bool:
         if not text:
             return False
         t = text.strip()
-        return t.startswith("---") or ("# Confluence Integration" in t) or (len(t) > 700 and "##" in t)
+        if t.startswith("---"):
+            return True
+        if "# Confluence Integration" in t or "# Available Tools" in t:
+            return True
+        if len(t) > 500 and ("## Quick Start" in t or "###" in t):
+            return True
+        return False
 
 
-def main():
+async def main():
     agent = SkillsAgentLangChain(verbose=True)
-    agent.chat()
+    await agent.chat()
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
