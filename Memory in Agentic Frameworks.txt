@@ -1,0 +1,819 @@
+
+ChatGPT said:
+Memory Capabilities in Agentic Frameworks and Memory Systems
+
+Memory Capabilities in Agentic Frameworks and Standalone Systems
+Overview of Memory in Agentic Frameworks
+Modern agentic AI frameworks integrate various memory mechanisms to help language-model-based agents retain information and improve over time. Key memory types include short-term (working) memory for immediate context, long-term memory for persistent knowledge, semantic memory for facts and concepts, episodic memory for past events or interactions, and procedural memory for learned skills or rules. Below we compare how four popular frameworks – Anthropic Claude’s Agent SDK, LangChain’s LangGraph (with LangMem), CrewAI, and Google’s Agent Development Kit (ADK) – handle these memory types. We also examine standalone memory systems (Mem0, Letta, Zep, LangMem SDK) that can augment or integrate with such frameworks. Finally, we clarify how “skills” (the tools or actions an agent can perform) differ from “memory” (the information an agent retains).
+Claude Agent SDK (Anthropic)
+Memory Handling: By default, Claude agents have no built-in long-term memory beyond the current conversation window
+. The Claude Agent SDK addresses this with a Memory Tool that lets the agent store and retrieve data to a file directory on the client side
+. Short-term memory is simply the conversation context (the recent messages and the agent’s chain-of-thought, up to Claude’s context window limit). Long-term memory is achieved by persisting information across sessions: the memory tool allows Claude to create/read/update files in a /memories directory, giving it a knowledge base it can consult beyond a single session
+. This means developers can implement semantic memory (facts or notes) by writing them to memory files, or episodic memory by logging events/outcomes for future reference. For example, Anthropic’s engineers have the agent write a claude-progress.txt log after each coding session – a persistent artifact that the next session’s agent reads to understand what has been done
+. This log serves as episodic memory of past actions. Procedural memory (rules for how to do tasks) in Claude’s case is largely contained in the prompt (the system instructions) or the model’s weights; the SDK doesn’t automatically update the agent’s “skills” on its own, but developers can manually refine prompts over time. Self-Improvement & Evolution: Claude’s framework supports agent evolution through memory in a rudimentary but effective way: the agent can learn from past interactions by reading what it wrote to the memory files
+. For instance, it can improve consistency on a long project by recalling previously discovered facts or previously written code. Anthropic has also introduced context compaction and multi-session strategies to help Claude work on long tasks without forgetting earlier steps
+. In practice, developers orchestrate self-improvement by feeding Claude its own outputs from prior sessions (via the memory files or progress logs) so it avoids repeating mistakes and builds on earlier work. However, the Claude Agent SDK does not yet implement automatic prompt optimization or skill learning loops – any major improvement in the agent’s core behavior usually comes from the developer updating the system prompt or providing feedback between runs. The memory tool’s main role is to ensure continuity and learning across sessions, e.g. remembering user preferences, past plans, or intermediate results so Claude performs better over time
+.
+LangChain LangGraph (with LangMem)
+Memory Handling: LangChain’s new LangGraph framework provides a structured approach to agent memory. It cleanly separates short-term memory (called thread-scoped memory) and long-term memory. Short-term memory is the ongoing conversation state within a single session (a “thread”)
+. LangGraph automatically checkpoints this state (message history, any interim data) to a database, allowing the agent to resume a conversation or process without losing context
+. Long-term memory in LangGraph is namespace-scoped, meaning information can persist across sessions or conversations and be queried when needed
+. LangChain explicitly models human-like memory types in its LangMem SDK:
+Semantic memory (facts) – storing factual information or extracted knowledge about the world or user
+. For instance, the agent can remember a user’s preferences or key domain facts not contained in the base model. LangMem provides a MemoryManager to extract and save such facts during conversations
+. This often uses a vector store or database of facts the agent accumulates.
+Episodic memory (experiences) – retaining records of specific past interactions or events. In LangChain, episodic memory might take the form of saving important examples or transcripts from previous episodes that the agent can refer to as needed
+. (LangMem currently doesn’t have a heavy built-in module for episodic memory beyond letting you store conversation data; the design encourages distilling episodes into either semantic facts or few-shot examples for later use
+.)
+Procedural memory (how-to/skills) – internalized knowledge of how to perform tasks or rules the agent should follow
+. In LangChain’s view, an agent’s procedural knowledge lives partly in its system prompt or policy and can be optimized over time. The LangMem SDK actually includes a Prompt Optimizer that can update the agent’s instructions based on past successes/failures
+. This is effectively procedural memory management: the agent learns better “skills” or rules (e.g. “if the user asks about astronomy, always mention moons if relevant”) by analyzing interaction trajectories and adjusting its core prompt
+. Procedural memory in LangChain is thus not a data store but a mechanism to evolve the agent’s behavior.
+LangChain’s memory system allows hot-path updates (the agent decides to remember something during an interaction) as well as background updates (asynchronous processing to update memories after an interaction)
+. All memories can be persisted in stores (vector databases, JSON, etc.) and recalled via LangChain’s retrieval functions
+. The framework even draws analogies to human memory – for example mapping semantic to factual knowledge, episodic to “things I did”, and procedural to ingrained instructions
+. In summary, short-term memory is handled via conversation state management, while long-term memory is handled via the LangMem SDK and vector stores, categorized into semantic/episodic/procedural for different uses
+. Self-Improvement & Evolution: LangChain explicitly supports agent self-improvement through memory. The procedural memory approach is a form of self-evolution – using feedback loops to refine the agent’s prompt/policy over time
+. For example, LangMem can take a set of past dialogues and outcomes (success or failure scores) and produce an improved system prompt that biases the agent toward more effective behavior
+. This means a LangChain agent can learn from its mistakes: if it consistently misses certain details, the Prompt Optimizer can add a rule to cover that gap in the future
+. Semantic memory also aids improvement by accumulating facts the agent didn’t originally “know,” thereby expanding its effective knowledge without retraining the model
+. Although LangChain provides the tools, the developer must decide when to invoke these learning processes (e.g. periodically run a prompt optimization, or store a new fact). Episodic memory (storing and recalling specific examples) can improve performance via better few-shot context – the agent can refer back to how it solved a similar problem before, guiding it to repeat or avoid past actions. Overall, LangChain’s memory framework is designed for lifelong learning: an agent that remembers user-specific info and past solutions to become more personalized and competent over time
+.
+CrewAI
+Memory Handling: CrewAI’s framework includes a built-in memory system that covers short-term, long-term, and entity memory out of the box
+. By enabling memory=True on an agent, developers get default implementations of these:
+Short-Term Memory: CrewAI uses a Retrieval-Augmented Generation (RAG) approach for short-term context
+. Recent interactions and results are embedded into a ChromaDB vector store, allowing the agent to retrieve relevant recent content when generating a response
+. This helps maintain coherence within the current conversation or task execution by recalling pertinent details even if the raw history is large (similar to a message buffer with semantic search).
+Long-Term Memory: CrewAI preserves cross-session knowledge in a SQLite database
+. Notably, it stores task results and insights from past runs so that an agent can build up knowledge over time. For example, if an agent accomplished a multi-step job or found a solution in a previous session, the outcome can be logged to long-term memory (SQLite) and later retrieved. This is analogous to episodic memory – the agent can recall what it learned or concluded before in order to inform future tasks. The use of a structured database means this memory can store text, summaries, or any data the developer chooses to log.
+Entity Memory: CrewAI also offers a specialized memory for entities (people, places, concepts), using RAG with a vector store to keep track of information about specific entities encountered
+. This functions like a mini knowledge graph: as the agent encounters a new person or concept, it can store facts or descriptions about them, enabling deeper understanding and consistency when that entity comes up again. In essence, this is semantic memory targeted at entities – facts and relationships are embedded so the agent can later retrieve “who is Alice?” or “what is Project X?” from its memory.
+CrewAI combines these into a Contextual Memory module that pulls from short-term, long-term, and entity stores as needed to maintain contextual continuity
+. By default, CrewAI stores the memory data in local files (using OS-specific app data directories) – for example, it creates folders for knowledge/, short_term_memory/, long_term_memory/, and entities/ with the relevant ChromaDB or SQLite files
+. This transparency allows developers to inspect or persist the memories easily. Importantly, CrewAI also supports external memory providers. Developers with specialized needs can disable the basic memory and plug in an external memory service via an ExternalMemory interface
+. For instance, CrewAI provides integration with Mem0 (see below) – in a few lines, one can connect Mem0’s memory model as the agent’s memory backend
+. External memory might be used to get more advanced semantic search, larger-scale vector databases, or cloud-based memory sharing across applications. A comparison in the documentation shows that while the built-in memory is simple and local, using an external memory can enable user-specific personalization and custom storage at the cost of more setup
+. In summary, CrewAI covers short-term and long-term memory needs by default and gives the flexibility to extend or replace the memory subsystem with external tools (vector DBs, memory services) as needed. Self-Improvement & Evolution: CrewAI’s memory system contributes to agent improvement primarily by accumulating knowledge. Each successful task outcome or user interaction can be logged in long-term memory, so the agent doesn’t repeat work or mistakes. For example, if an agent already solved a sub-problem in a previous run, it can recall that solution instead of recalculating it, thus improving efficiency and competence over time. This is a form of learning from experience. Because CrewAI’s short-term memory uses semantic search, the agent can also avoid losing important context in long conversations – it “forgets” less and can bring relevant past points back when needed. That improves coherence and prevents the agent from contradicting itself or asking the same questions again. CrewAI does not (as of writing) have an explicit module for autonomous prompt evolution or skill learning (no direct counterpart to LangChain’s prompt optimizer). Self-improvement is therefore realized implicitly: the agent’s knowledge grows with each interaction. Notably, if integrating an external memory like Mem0, the agent can benefit from pattern learning (e.g. Mem0 can infer user habits – more on this below – which CrewAI’s agent could use to adjust its suggestions). In that sense, pairing CrewAI with a system like Mem0 could give a personalization feedback loop, where the agent adapts to the user’s behavior over time
+. Overall, CrewAI’s design leans toward reliability and accumulation – making sure valuable information is retained so the agent incrementally improves its answers and avoids past pitfalls. Any more advanced self-evolution (like rewriting its own goals or adding new skills) would currently have to be implemented by the developer on top of the provided memory mechanisms.
+Google Agent Development Kit (ADK)
+Memory Handling: Google’s ADK (often used with Vertex AI) approaches agent memory via the concepts of session state and memory services. A session in ADK represents one contiguous interaction (e.g. a chat session) and includes a history of events (messages) and a modifiable state (key–value memory within that conversation)
+. This is essentially short-term memory: the agent’s immediate context for the current conversation. ADK’s session state can track things like the user’s name or progress through a task within that session
+. By default, this short-term memory lives in-memory (RAM) and is lost when the session ends or the server restarts
+. However, ADK provides a SessionService that can be backed by a database to persist session data if needed (for production deployments)
+. ADK even has “magic” prefixes for state keys (like user:, app:) that allow certain pieces of state to persist across sessions, e.g. a user’s setting that should apply every time
+. This bridges short-term and long-term a bit by letting some session data become semi-permanent. For true long-term memory, ADK offers the MemoryService abstraction
+. There are two implementations:
+In-Memory MemoryService: Simply stores all past session transcripts in memory for search. This is mainly for prototyping – it retains full conversation logs (raw chat history) and only supports basic keyword search for retrieval
+. It’s akin to a naive episodic memory: the agent can query past chats by keyword, but there’s no intelligent processing of those logs.
+Vertex AI Memory Bank Service: This is a more advanced, cloud-managed memory. The Memory Bank uses a large model (Google’s Gemini model) to extract meaningful information from conversations and store those distilled “memories” in a persistent store
+. In other words, instead of keeping full transcripts, it picks out the key facts or outcomes (a semantic summary) and accumulates those. The agent can later query this memory by using a semantic search interface – the Memory Bank supports vector similarity search over the stored memories
+. For example, if across chats the user mentioned their favorite color or a specific problem, the Memory Bank would have a record of that fact which can be retrieved even in a new session. This corresponds to semantic memory (facts about the user or context) gleaned from episodic interactions. It’s also a form of long-term episodic memory, since it keeps track of what happened “many conversations ago,” but in a summarized way.
+Using the MemoryService, an ADK agent can automatically save a session to long-term memory (usually at the end of the session) and later load relevant info when a new session starts or when needed
+. In practice, developers set up a callback or configuration so that once a conversation is done, the agent calls add_session_to_memory() to ingest that session’s info into the Memory Bank
+. When the agent needs to answer a question in a new session, it can call a memory tool (like load_memory) or a search function to retrieve any matching facts from the Memory Bank
+. The retrieved snippets are then added to the prompt so the agent “recalls” them. This design cleanly separates short-term vs. long-term: short-term is the session (transient but can be DB-backed), and long-term is the Memory Bank (persistent and summarized). Memory Types: While ADK’s documentation doesn’t explicitly label memory as semantic/episodic/procedural, we can map them. Semantic memory is represented by the distilled facts in Memory Bank (it stores general knowledge the agent learned about the user or context, not entire episodes)
+. Episodic memory is present in that the agent can refer to specific past events, but typically via the semantic extraction (for example, “what was the user’s score last session?” would be stored as a fact). If needed, one could use raw transcripts (episodic) via the in-memory service, but that’s less scalable. Procedural memory (rules for task execution) is not really handled by ADK automatically – the agent’s “skills” or behaviors are defined by its prompt and code. ADK is more about orchestration, so it doesn’t have a built-in mechanism for an agent to learn new procedures on its own. Developers would have to update the agent’s prompt or give it new tools (skills) if they want to change its procedural knowledge. Self-Improvement & Evolution: Google’s ADK enables continuous improvement mainly through better context and personalization. By using the Memory Bank, an agent can learn from past conversations – e.g. remembering a user’s preferences, past issues, or progress – which makes future interactions more personalized and efficient
+. For instance, an agent could gradually build a profile of a student’s learning difficulties and adapt its tutoring strategy accordingly in subsequent sessions
+. This is a form of self-improvement, albeit guided by the developer’s setup of what to store. The agent is not rewriting its own code or prompt, but it is improving its answers by having access to a growing knowledge base of prior interactions. The Memory Bank’s use of AI to summarize means the agent’s long-term memory stays concise and focused, avoiding overwhelming the model with too much irrelevant old context
+. In terms of agent evolution, ADK’s philosophy is to give the agent the right information rather than change the agent’s inherent reasoning abilities. There is no built-in analog of a prompt optimizer or reflective loop in ADK as of now. However, a developer could manually analyze stored conversations and fine-tune the model or adjust prompts externally. To summarize, ADK’s agent evolution through memory manifests as better contextual awareness and personalization over time (the agent “remembers you”), rather than the agent autonomously learning entirely new behaviors.
+Comparison of Framework Memory Features
+The table below summarizes how each framework addresses different memory types and agent learning:
+Framework	Short-Term Memory (within session)	Long-Term Memory (across sessions)	Semantic vs Episodic Memory	Procedural Memory (skills/rules)	Self-Improvement Mechanisms
+Claude Agent SDK	Conversation context (limited by context window)
+. Optionally uses compaction (summaries) to not exceed window
+.	Memory Tool for persistence
+ – reads/writes files to retain info between runs. Developer can store notes, logs, etc.	No explicit built-in separation; can emulate episodic memory via logs (e.g. progress.txt) and semantic memory by saving extracted facts in files.	LLM’s behavior guided by prompt; no auto-update of rules. Procedural knowledge must be given by developer (or via fine-tuning).	Learns from past via memory files: next session reads what previous session left
+. Reduces forgetting by carrying over important context
+. No built-in prompt learning loop.
+LangChain LangGraph	Thread-scoped state stored via checkpointing
+. Maintains full message history (pruned or filtered if needed) in a conversation thread.	LangMem stores long-term data in custom namespaces
+. Supports persistent vector stores or databases for memories accessible in any session.	Explicit types: Semantic memory for facts (e.g. user profile)
+, Episodic for past examples
+, Procedural for learned rules
+. Each handled via specialized APIs (extractors, prompt updates, etc.).	Yes – Procedural memory via prompt updates. LangMem can refine the agent’s system prompt (rules) from interaction feedback
+, effectively letting the agent evolve its skills.	Built-in support for lifelong learning: can update memory on-the-fly or in background
+. Prompt optimization allows the agent to improve behavior after failures
+. Memories (facts/examples) accumulated to avoid relearning things
+.
+CrewAI	Short-term context with RAG: recent messages/results embedded in ChromaDB for retrieval
+. Provides continuity in ongoing tasks.	Long-term SQLite DB to save past task outcomes, insights
+. Ensures knowledge is retained across runs. Also entity memory database for persistent info on specific entities
+.	Not distinctly labeled, but semantic knowledge is captured in entity memory (facts about people, etc.) and an optional knowledge base. Episodic info is in long-term storage (records of completed tasks = past experiences).	No direct mechanism to alter agent’s core logic. The agent’s “skills” (tools, etc.) are defined in code. Procedural knowledge can be encoded in prompt or tools, but not learned on its own.	Incremental learning by accumulation: Every run can add to long-term memory, so agent references past successes to improve future decisions. If paired with external memory (e.g. Mem0), can adapt to user’s patterns (personalization) over time
+. No autonomous policy revision, but avoids repeating mistakes by remembering prior outcomes.
+Google ADK	Session state and event history
+. Can persist session via DB to survive restarts
+. By default isolated per session unless using special keys to carry over small pieces
+.	MemoryService provides long-term memory. In-memory variant (non-persistent) stores raw chat logs (for prototyping)
+. Vertex AI Memory Bank (persistent) stores extracted key info with semantic search
+.	Semantic memory is achieved via Memory Bank’s distilled facts (e.g. “user’s favorite color is blue”). Episodic memory: the agent can retrieve info from specific past interactions, but mainly through the semantic lens (important events become facts).	No direct procedural memory module. The agent’s methods are static (defined by developer prompts and available tools). ADK does not let the agent rewrite its skill set on its own.	Personalization and context continuity: agent “remembers” user-specific details across sessions with Memory Bank
+. Improves responses by recalling past interactions (e.g. avoids repeating explanations). No built-in self-tuning of prompts or model behavior. Any policy improvements require external intervention (developer updates or fine-tuning).
+Standalone Memory Systems and Integration
+Beyond the frameworks’ native capabilities, developers often integrate dedicated memory services or libraries into agent workflows. These standalone memory systems focus on providing extended long-term memory, personalization, or advanced retrieval that can plug into any agentic framework. We will look at Mem0, Letta, Zep, and LangMem (SDK) – what they offer independently and how they can be used in agent architectures.
+Mem0
+Mem0 (pronounced “mem-zero”) is a memory layer designed for long-lived AI assistants with personalization. It treats memory as a first-class component. Mem0’s approach is to infer and store user-specific knowledge from interactions. For example, Mem0 will pick up on patterns like “the user usually prefers reminders at 8 PM” or “they tend to snooze work tasks by 15 minutes”
+. It separates the notion of application state (e.g. the list of reminders in a to-do app) from personalization memory (the user’s habits, preferences, and history). In practice, Mem0 uses an LLM under the hood to analyze conversation and usage data and produce structured memory entries. These can be things like preferences (explicit facts about the user) and behavior summaries (statistical or high-level observations about user behavior)
+. Mem0 then stores these memories in a database or vector store (Mem0 supports various backends like Qdrant for vectors, with OpenAI or other embedder models)
+. Because Mem0 auto-categorizes information, developers can define memory categories – for instance, “personal_information” or custom domains – and Mem0 will file inferred facts accordingly
+. As an independent tool, Mem0 provides an API (and Python client) where you feed in events (e.g. conversations, user actions) and it updates the memory store. You can then query Mem0 for relevant context to inject into the agent’s prompt. The integration is straightforward: frameworks like CrewAI have a built-in connector for Mem0
+, and one can similarly integrate Mem0 into LangChain or Claude by treating it as an external knowledge source. In the Claude RecallAgent example from Mem0’s blog, they combined Claude’s Agent SDK with Mem0: Claude handled the dialogue and tool use, while Mem0 supplied a “mem0_context” object containing the user’s preferences and recent behavior stats to enrich Claude’s prompt
+. This resulted in an agent that adapts its suggestions based on the user’s learned habits – for instance, proactively suggesting a reminder time the user often prefers
+. Memory Types: Mem0 excels at semantic and episodic memory fusion. It keeps raw logs (episodic data) but crucially derives semantic memories (facts like “User is a morning person”) from them. It doesn’t explicitly store step-by-step episodes for the agent to read; rather it condenses them into useful knowledge chunks. Mem0’s memory model can be seen as a form of long-term semantic memory with personalization focus. It likely does not handle procedural memory (it won’t change the agent’s toolset or rules), but it can certainly inform the agent’s procedure by, say, indicating how the agent should tailor its behavior to the user (which the agent’s prompt can incorporate). Agent Evolution: Using Mem0 can drive agent evolution through personalization. Over weeks or months, an agent using Mem0 becomes increasingly fine-tuned to the user: it remembers what the user has done, likes, or struggles with, without forgetting older context (since Mem0 persists it). This means the agent’s responses and suggestions improve (more relevant, less repetitive) and the agent “learns” in a non-destructive way (Mem0 archives old info rather than losing it)
+. One key point: Mem0 aims to “remember without hallucinating”
+ – by grounding memories in a database, the agent knows where to look up factual info (e.g. whether a reminder is active or done) rather than guessing. In summary, Mem0 used alongside an agent framework provides a robust long-term memory store that augments the agent’s built-in memory with deep personalization, enabling the agent to adapt its behavior while maintaining reliability.
+Letta
+Letta is an AI agent platform with a sophisticated built-in memory architecture (as described in Letta’s blog). It can be viewed as both an independent system and a reference design for memory management. Letta’s memory system is composed of multiple layers:
+Message Buffer (Recent Memory): This holds the last few turns of conversation – essentially the agent’s short-term working memory
+. In Letta, agents run in a single perpetual thread of dialogue, meaning the conversation isn’t reset between sessions. The message buffer ensures immediate context is on hand to maintain a coherent dialogue flow.
+Core Memory (In-Context Blocks): These are dedicated memory blocks pinned in the prompt context that the agent or other helper agents manage
+. Each block has a specific focus (for example, a “User Profile” block with the user’s preferences, an “Agent Persona” block defining its identity, or a “Current Task” block). Core memory blocks are essentially editable slots of context that remain in the prompt. The agent can update these via tools (e.g. an agent might have a tool to update the “user_preferences” block if it learns something new)
+. They provide structured, immediately accessible memory that doesn’t rely on retrieval – it’s analogous to giving the agent a scratchpad or notes within its context window.
+Recall Memory (Full History): This is a complete log of all interactions that is stored persistently (on disk/database)
+. The recall memory is not continuously in the prompt, but it’s searchable. So if the agent needs to recall something not in the recent buffer, it can query the recall log. Letta automates saving this history; other frameworks might require manual handling to persist chat transcripts
+. Recall memory is essentially episodic memory: a record of everything that happened, which can be retrieved on demand.
+Archival Memory (Knowledge Store): This is an external, structured store of processed knowledge
+. Unlike recall (raw logs), archival memory consists of indexed facts, concepts, or summary information gleaned from the agent’s experience or provided data. This could be a vector database of facts, a graph database of relationships, or any knowledge base the agent can query during conversations
+. Archival memory is akin to semantic memory – it holds distilled knowledge the agent has explicitly learned or was given, separate from the transient conversation flow.
+The Letta design also involves techniques to manage these memories, like message eviction & summarization (compressing old dialogue when the context window is full)
+ and recursive summarization (iteratively summarizing older content to keep summaries concise). It even suggests a concept of “sleep-time agents” – background agents that, when the main agent is idle, will reorganize and optimize its memory (e.g. improve summaries, consolidate blocks)
+. This is a novel idea for agent evolution: the agent’s memory gets refined asynchronously, leading to higher quality long-term memory without burdening the main conversation. As an independent tool, Letta’s memory components aren’t (to public knowledge) packaged as a library you can plug into any agent – rather, they are part of Letta’s own agent platform. However, one can integrate similar ideas: for example, implementing a single-thread conversation in something like LangChain to mimic the perpetual thread, or using multiple prompt segments (like LangChain’s Memory Components in chains) to simulate core memory blocks. Letta’s concept of recall vs. archival memory provides insight on how to design memory: raw history vs processed knowledge. Developers of other agents can similarly maintain a log and a distilled fact store. Letta shows that while human memory terms (procedural, episodic, semantic) are useful, practical agent memory might be organized by function (recent vs. long-term, raw vs. processed)
+. Skills vs Memory in Letta: Not explicitly mentioned, but Letta’s approach suggests a difference: memory is the information store, whereas skills (or tools) would be things like the ability to manage memory blocks or perform searches. For instance, an agent might have a “UpdateMemoryBlock” skill – that’s a procedure – separate from the memory itself which is just data. Agent Evolution: Letta’s asynchronous memory management hints at self-improvement. By having specialized processes update and optimize the agent’s memory, the agent effectively learns better representations of past knowledge over time (e.g. better summaries). This means the agent’s long-term memory becomes more accurate and efficient, which should improve its performance. Letta also indicates that with persistent recall, the agent won’t forget details unless intentionally evicted – so it can maintain consistency over very long periods (useful for an agent that a user interacts with over months). Although Letta’s blog emphasizes context engineering (as opposed to directly emulating brain-like memory)
+, the result is an agent that can learn through experience: it updates its memory blocks as it gains new info and uses external storage to augment its limited context window
+. In short, Letta’s independent memory model demonstrates that an agent can be designed to continuously integrate new knowledge and maintain important old knowledge, leading to an evolving capability without retraining the core model.
+Zep
+Zep is a standalone “context engineering” and memory platform for AI agents. It is built to address the common failure mode of agents: lack of the right context
+. Zep takes in all kinds of data – chat conversations, user events, documents – and builds a unified, evolving knowledge graph out of them
+. In Zep’s architecture:
+Ingestion: As new data comes in (e.g. a user says something, or an external event occurs), Zep extracts entities, facts, and relationships from it
+. This is done automatically using NLP/LLM techniques. For example, if a user says “I moved my meeting to 3 PM,” Zep might extract an entity “meeting” with a fact “scheduled at 3 PM” and a relationship to the user.
+Temporal Knowledge Graph: Zep organizes extracted information into a graph that has a time dimension
+. Each fact or entity state is stored with validity timestamps (“from X to Y this was true”)
+. When facts change (e.g. an address is updated, an order status changes), Zep does fact invalidation, meaning it marks the old fact as expired and the new fact as current
+. This is powerful for ensuring the agent’s memory isn’t cluttered with outdated or contradictory info – it knows the timeline.
+Assembly/Retrieval: When an agent needs context, it queries Zep (usually with the current conversation or a specific query). Zep then retrieves the relevant nodes from the graph and assembles a context document for the agent
+. This assembly can include the user’s traits, recent relevant interactions, and any pertinent business or world knowledge, formatted in a concise way
+. The idea is to give the agent exactly the information it needs at that moment, with each fact justified by source and time.
+As an independent service, Zep provides a simple API/SDK. In a typical integration, an agent developer would send each new message or event to Zep via client.thread.add_messages(...) and Zep returns a context (which can be directly inserted into the prompt)
+. The returned context, as shown in Zep’s example, could read like a summary: e.g. a user profile (“Emily is a user who does X, recently had issue Y...”) followed by a list of relevant facts with dates
+. The agent then gets a turn-by-turn updated memory without manually searching a vector DB or maintaining its own long-term store – Zep handles it. Zep is designed to work with any framework (LangChain, etc.) with minimal code, and it emphasizes speed (sub-200ms retrieval so it can be used in real-time applications)
+. Memory Types: Zep’s approach blurs semantic and episodic memory in a beneficial way. It stores episodic events (conversations, transactions) but converts them into semantic form (facts, structured knowledge in the graph). Because it keeps the temporal aspect, one can consider it maintaining an episodic timeline of facts. It’s particularly well-suited to domains where facts update (like user state, CRM data) – a strength in enterprise settings. Zep does not inherently handle “procedural memory” (it’s not about teaching the agent new skills), but it can store procedures as knowledge if expressed in text or data (for instance, it could store that “the procedure to reset a password was done at time X” – a fact, but it won’t rewrite how the agent executes it). Agent Evolution: By using Zep, an agent effectively gains a dynamic, self-maintaining memory. The agent doesn’t need to explicitly summarize or categorize its experiences; Zep does that in the background by updating the knowledge graph. This means over time the agent’s knowledge of the user and environment becomes richer and more up-to-date without manual intervention. The agent is far less likely to fail due to missing context – as Zep’s site puts it, agents fail not because the model is bad but because they lack context
+. Zep ensures the agent always has the right context assembled from all relevant sources, thereby improving its performance and reliability. It’s a form of automatic continuous learning: every interaction literally updates the graph memory. For example, if yesterday the user said “I love Adidas shoes” and today asks for shoe recommendations, Zep would surface the fact “User favors Adidas” so the agent can tailor its answer – demonstrating learning of user preference (semantic memory) from an episodic event. In conclusion, Zep as a standalone memory system can be plugged into agent frameworks to supercharge their memory: the agent focuses on reasoning and tool use, while Zep feeds it an evolving knowledge base to reason over. This significantly aids long-term coherence, personalization, and the agent’s ability to handle changing information
+.
+LangMem SDK (Standalone Usage)
+We discussed LangChain’s LangMem in the context of LangGraph, but it’s worth noting that LangMem is envisioned as a somewhat framework-agnostic memory SDK too. It can be treated as a standalone library to add long-term memory to agents. If you are not using the full LangGraph, you could still use LangMem’s components:
+The semantic memory extractor (MemoryManager) to automatically parse conversations and pull out facts to store
+.
+The prompt optimizer to improve procedural knowledge by reflecting on dialogue trajectories
+.
+Methods to save and retrieve memories by namespace, which you can integrate with your own state management
+.
+In other words, LangMem can serve as an external memory module (similar to Mem0 or Zep) if you hook it into your agent: after each interaction, run the memory update routines; before each interaction, fetch relevant stored memory. LangMem emphasizes the trio of semantic, episodic, procedural: it is one of the few solutions explicitly aiming to cover all three. For example, you could integrate LangMem in a custom agent to store a user profile (semantic), store distilled dialogues as examples (episodic), and periodically refine the agent prompt (procedural)
+. This holistic approach means the agent not only remembers facts and events but also improves its base behavior. As an independent tool, LangMem is still emerging (the LangChain blog indicates it’s under active development and they invite teams to try it)
+. It likely plugs into LangChain’s own ecosystem (e.g. LangSmith observability) more easily, but in principle one could use LangMem’s algorithms with, say, the Claude SDK or Google ADK by writing some glue code. The benefit would be to get a ready-made solution for memory types: for instance, using LangMem to manage an agent’s long-term knowledge store instead of writing custom logic. Agent Evolution: Using LangMem outside LangChain would still bring the same advantage: the agent can learn from feedback and adapt. For example, consider integrating LangMem with Claude – you might capture Claude’s mistakes and successes in a log, run LangMem’s prompt optimizer to adjust Claude’s system prompt (procedural memory updated), and store new facts Claude learned in an external DB (semantic memory). Over time, even a Claude-based agent could become more specialized to its user or task, without retraining. LangMem’s episodic memory concept (turning specific past cases into few-shot examples) can also boost performance by essentially fine-tuning via examples at inference time. In summary, LangMem (as an SDK) provides a blueprint to incorporate human-like memory facets into any agent workflow. It underlines the difference between just storing data and truly using it for improvement: semantic memory for knowledge accumulation, episodic for learning from cases, and procedural for updating the agent’s “skills” or policies. This makes it a comprehensive standalone memory solution that, much like others, can be integrated into agentic systems to extend their memory and learning capabilities beyond what they offer out-of-the-box.
+Skills vs. Memory in Agent Frameworks
+In the context of these frameworks, it’s important to distinguish “skills” (or tools) from “memory.” Although both contribute to an agent’s effectiveness, they are fundamentally different components:
+Skills (Tools/Actions): Skills are the capabilities or actions an agent can execute. These are often implemented as API calls, function executions, or predefined procedures that the agent can invoke when needed. For example, a skill might be “Search the web,” “Do math calculation,” “Query a database,” or “Send an email.” In LangChain and Claude, these are referred to as tools; in Google’s ADK, they’re simply agent functions or external calls. Skills are typically static or coded: the developer defines what tools are available and how they work. They represent procedural knowledge in the sense of how to do something, but the agent doesn’t “remember” a skill – it either has it or not by design. For instance, the Sierra agent framework (noted by LangChain’s blog) allows developers to compose skills to express procedural knowledge – meaning the developer programs the procedures the agent can use
+. Thus, skills are about action and ability. If an agent is a robot, skills are like its built-in functions or programs.
+Memory: Memory, on the other hand, is about information retention. It’s the agent’s store of knowledge and past experience. Memory does not directly perform actions; instead, it informs the agent’s decisions by providing context. For example, an agent’s memory might contain “User’s name is Alice and she likes sci-fi genre” or “We solved problem X last week using method Y.” This information can influence the agent’s responses (personalizing them or avoiding repeating past mistakes). Memory can be short-term (only recent info) or long-term (persisted facts and histories). Unlike skills, memory content is typically dynamic – it grows and changes as the agent interacts and learns. Memory answers the question “What does the agent know?” (or remember), whereas skills answer “What can the agent do?”.
+All the frameworks we discussed keep this separation. For instance, in Claude’s Agent SDK, one defines a set of tools (skills) the agent can call (e.g. a calculator, or the memory tool itself)
+. Separately, the memory tool stores data but doesn’t execute anything on its own – the agent must decide to use the “memory” skill to read/write it. In LangChain, tools are functions the agent can use during its reasoning loop, while memory is part of the agent’s state that gets injected into the prompt. In CrewAI, you also define tools in the Agent (like file operations, web requests, etc.), and memory is handled by the framework in the background unless the agent specifically queries it. Google’s ADK similarly has a library of tools and a separate memory service – using memory might itself be implemented as a tool (e.g. ADK provides a load_memory tool for the agent to query its MemoryService)
+. Differences in practice: A skill is often invoked when the agent’s reasoning determines “I need to perform X action now.” Memory comes into play either implicitly (through the context given to the model) or explicitly when the agent thinks “I should check if I know something about this from before.” Some frameworks blur the line by making memory retrieval an automated step. For example, Zep automatically provides context – the agent doesn’t call a “remember” tool, Zep just augments the prompt. But conceptually, the agent gained no new skill; it’s simply being fed information. The skill in that case was on the developer’s side – integrating Zep – not the agent’s cognitive repertoire. Procedural Memory vs Skills: There is a subtle overlap: procedural memory in humans is knowing how to do things (ride a bike, etc.), which in agents corresponds to skills or policies. When LangChain updates procedural memory by changing the prompt with new instructions, you could say the agent “learned a new skill” (or refined a skill) in a limited way. But generally, frameworks treat skills as fixed primitives and don’t let agents create entirely new tools at runtime. An agent can learn when or how to better use its skills (through memory of outcomes), but not invent new API calls on the fly. For instance, an agent might remember “the last time I used the ‘translate’ tool, the user was happy” – that memory might make it use that tool more readily (a kind of learned strategy). The skill (translate tool) was always there; memory just provided guidance. In summary, skills are the actions an agent is equipped to take, while memory is the knowledge an agent retains. A well-designed agent needs both: skills to interact with the world or perform computations, and memory to inform those actions with context and experience. The balance and interplay are evident in all frameworks – they provide tool APIs for skills and memory modules for knowledge. A change in memory (say, adding a new fact) can immediately influence an agent’s output, whereas adding a new skill might enable entirely new capabilities. Conversely, memory decay or loss can make the agent forget context, while lack of a certain skill means the agent is incapable of a class of actions (no matter how much it remembers). Understanding this distinction helps developers decide how to improve an agent: e.g. add memory if the agent is forgetful or not learning from the past, vs. add skills if the agent is missing functionality. Both are crucial for creating sophisticated, continually learning agents that can not only recall information but also execute complex sequences to achieve goals.
+
+
+
+
+
+
+Sources
+
+
+
+Attach
+
+Search
+
+Study
+
+Create image
+
+Voice
+We use cookies
+
+We use cookies to help this site function, understand service usage, and support marketing efforts. Visit Manage Cookies to change preferences anytime. View our Cookie Policy for more info.
+
+
+Manage Cookies
+
+Reject non-essential
+
+Accept all
+
+Memory in Agentic Frameworks
+You’re viewing user-generated content that may be unverified or unsafe.
+Report
+Memory Capabilities in Agentic Frameworks and Standalone Systems
+Overview of Memory in Agentic Frameworks
+Modern agentic AI frameworks integrate various memory mechanisms to help language-model-based agents retain information and improve over time. Key memory types include short-term (working) memory for immediate context, long-term memory for persistent knowledge, semantic memory for facts and concepts, episodic memory for past events or interactions, and procedural memory for learned skills or rules. Below we compare how four popular frameworks – Anthropic Claude’s Agent SDK, LangChain’s LangGraph (with LangMem), CrewAI, and Google’s Agent Development Kit (ADK) – handle these memory types. We also examine standalone memory systems (Mem0, Letta, Zep, LangMem SDK) that can augment or integrate with such frameworks. Finally, we clarify how “skills” (the tools or actions an agent can perform) differ from “memory” (the information an agent retains).
+Claude Agent SDK (Anthropic)
+Memory Handling: By default, Claude agents have no built-in long-term memory beyond the current conversation window
+. The Claude Agent SDK addresses this with a Memory Tool that lets the agent store and retrieve data to a file directory on the client side
+. Short-term memory is simply the conversation context (the recent messages and the agent’s chain-of-thought, up to Claude’s context window limit). Long-term memory is achieved by persisting information across sessions: the memory tool allows Claude to create/read/update files in a /memories directory, giving it a knowledge base it can consult beyond a single session
+. This means developers can implement semantic memory (facts or notes) by writing them to memory files, or episodic memory by logging events/outcomes for future reference. For example, Anthropic’s engineers have the agent write a claude-progress.txt log after each coding session – a persistent artifact that the next session’s agent reads to understand what has been done
+. This log serves as episodic memory of past actions. Procedural memory (rules for how to do tasks) in Claude’s case is largely contained in the prompt (the system instructions) or the model’s weights; the SDK doesn’t automatically update the agent’s “skills” on its own, but developers can manually refine prompts over time. Self-Improvement & Evolution: Claude’s framework supports agent evolution through memory in a rudimentary but effective way: the agent can learn from past interactions by reading what it wrote to the memory files
+. For instance, it can improve consistency on a long project by recalling previously discovered facts or previously written code. Anthropic has also introduced context compaction and multi-session strategies to help Claude work on long tasks without forgetting earlier steps
+. In practice, developers orchestrate self-improvement by feeding Claude its own outputs from prior sessions (via the memory files or progress logs) so it avoids repeating mistakes and builds on earlier work. However, the Claude Agent SDK does not yet implement automatic prompt optimization or skill learning loops – any major improvement in the agent’s core behavior usually comes from the developer updating the system prompt or providing feedback between runs. The memory tool’s main role is to ensure continuity and learning across sessions, e.g. remembering user preferences, past plans, or intermediate results so Claude performs better over time
+.
+LangChain LangGraph (with LangMem)
+Memory Handling: LangChain’s new LangGraph framework provides a structured approach to agent memory. It cleanly separates short-term memory (called thread-scoped memory) and long-term memory. Short-term memory is the ongoing conversation state within a single session (a “thread”)
+. LangGraph automatically checkpoints this state (message history, any interim data) to a database, allowing the agent to resume a conversation or process without losing context
+. Long-term memory in LangGraph is namespace-scoped, meaning information can persist across sessions or conversations and be queried when needed
+. LangChain explicitly models human-like memory types in its LangMem SDK:
+Semantic memory (facts) – storing factual information or extracted knowledge about the world or user
+. For instance, the agent can remember a user’s preferences or key domain facts not contained in the base model. LangMem provides a MemoryManager to extract and save such facts during conversations
+. This often uses a vector store or database of facts the agent accumulates.
+Episodic memory (experiences) – retaining records of specific past interactions or events. In LangChain, episodic memory might take the form of saving important examples or transcripts from previous episodes that the agent can refer to as needed
+. (LangMem currently doesn’t have a heavy built-in module for episodic memory beyond letting you store conversation data; the design encourages distilling episodes into either semantic facts or few-shot examples for later use
+.)
+Procedural memory (how-to/skills) – internalized knowledge of how to perform tasks or rules the agent should follow
+. In LangChain’s view, an agent’s procedural knowledge lives partly in its system prompt or policy and can be optimized over time. The LangMem SDK actually includes a Prompt Optimizer that can update the agent’s instructions based on past successes/failures
+. This is effectively procedural memory management: the agent learns better “skills” or rules (e.g. “if the user asks about astronomy, always mention moons if relevant”) by analyzing interaction trajectories and adjusting its core prompt
+. Procedural memory in LangChain is thus not a data store but a mechanism to evolve the agent’s behavior.
+LangChain’s memory system allows hot-path updates (the agent decides to remember something during an interaction) as well as background updates (asynchronous processing to update memories after an interaction)
+. All memories can be persisted in stores (vector databases, JSON, etc.) and recalled via LangChain’s retrieval functions
+. The framework even draws analogies to human memory – for example mapping semantic to factual knowledge, episodic to “things I did”, and procedural to ingrained instructions
+. In summary, short-term memory is handled via conversation state management, while long-term memory is handled via the LangMem SDK and vector stores, categorized into semantic/episodic/procedural for different uses
+. Self-Improvement & Evolution: LangChain explicitly supports agent self-improvement through memory. The procedural memory approach is a form of self-evolution – using feedback loops to refine the agent’s prompt/policy over time
+. For example, LangMem can take a set of past dialogues and outcomes (success or failure scores) and produce an improved system prompt that biases the agent toward more effective behavior
+. This means a LangChain agent can learn from its mistakes: if it consistently misses certain details, the Prompt Optimizer can add a rule to cover that gap in the future
+. Semantic memory also aids improvement by accumulating facts the agent didn’t originally “know,” thereby expanding its effective knowledge without retraining the model
+. Although LangChain provides the tools, the developer must decide when to invoke these learning processes (e.g. periodically run a prompt optimization, or store a new fact). Episodic memory (storing and recalling specific examples) can improve performance via better few-shot context – the agent can refer back to how it solved a similar problem before, guiding it to repeat or avoid past actions. Overall, LangChain’s memory framework is designed for lifelong learning: an agent that remembers user-specific info and past solutions to become more personalized and competent over time
+.
+CrewAI
+Memory Handling: CrewAI’s framework includes a built-in memory system that covers short-term, long-term, and entity memory out of the box
+. By enabling memory=True on an agent, developers get default implementations of these:
+Short-Term Memory: CrewAI uses a Retrieval-Augmented Generation (RAG) approach for short-term context
+. Recent interactions and results are embedded into a ChromaDB vector store, allowing the agent to retrieve relevant recent content when generating a response
+. This helps maintain coherence within the current conversation or task execution by recalling pertinent details even if the raw history is large (similar to a message buffer with semantic search).
+Long-Term Memory: CrewAI preserves cross-session knowledge in a SQLite database
+. Notably, it stores task results and insights from past runs so that an agent can build up knowledge over time. For example, if an agent accomplished a multi-step job or found a solution in a previous session, the outcome can be logged to long-term memory (SQLite) and later retrieved. This is analogous to episodic memory – the agent can recall what it learned or concluded before in order to inform future tasks. The use of a structured database means this memory can store text, summaries, or any data the developer chooses to log.
+Entity Memory: CrewAI also offers a specialized memory for entities (people, places, concepts), using RAG with a vector store to keep track of information about specific entities encountered
+. This functions like a mini knowledge graph: as the agent encounters a new person or concept, it can store facts or descriptions about them, enabling deeper understanding and consistency when that entity comes up again. In essence, this is semantic memory targeted at entities – facts and relationships are embedded so the agent can later retrieve “who is Alice?” or “what is Project X?” from its memory.
+CrewAI combines these into a Contextual Memory module that pulls from short-term, long-term, and entity stores as needed to maintain contextual continuity
+. By default, CrewAI stores the memory data in local files (using OS-specific app data directories) – for example, it creates folders for knowledge/, short_term_memory/, long_term_memory/, and entities/ with the relevant ChromaDB or SQLite files
+. This transparency allows developers to inspect or persist the memories easily. Importantly, CrewAI also supports external memory providers. Developers with specialized needs can disable the basic memory and plug in an external memory service via an ExternalMemory interface
+. For instance, CrewAI provides integration with Mem0 (see below) – in a few lines, one can connect Mem0’s memory model as the agent’s memory backend
+. External memory might be used to get more advanced semantic search, larger-scale vector databases, or cloud-based memory sharing across applications. A comparison in the documentation shows that while the built-in memory is simple and local, using an external memory can enable user-specific personalization and custom storage at the cost of more setup
+. In summary, CrewAI covers short-term and long-term memory needs by default and gives the flexibility to extend or replace the memory subsystem with external tools (vector DBs, memory services) as needed. Self-Improvement & Evolution: CrewAI’s memory system contributes to agent improvement primarily by accumulating knowledge. Each successful task outcome or user interaction can be logged in long-term memory, so the agent doesn’t repeat work or mistakes. For example, if an agent already solved a sub-problem in a previous run, it can recall that solution instead of recalculating it, thus improving efficiency and competence over time. This is a form of learning from experience. Because CrewAI’s short-term memory uses semantic search, the agent can also avoid losing important context in long conversations – it “forgets” less and can bring relevant past points back when needed. That improves coherence and prevents the agent from contradicting itself or asking the same questions again. CrewAI does not (as of writing) have an explicit module for autonomous prompt evolution or skill learning (no direct counterpart to LangChain’s prompt optimizer). Self-improvement is therefore realized implicitly: the agent’s knowledge grows with each interaction. Notably, if integrating an external memory like Mem0, the agent can benefit from pattern learning (e.g. Mem0 can infer user habits – more on this below – which CrewAI’s agent could use to adjust its suggestions). In that sense, pairing CrewAI with a system like Mem0 could give a personalization feedback loop, where the agent adapts to the user’s behavior over time
+. Overall, CrewAI’s design leans toward reliability and accumulation – making sure valuable information is retained so the agent incrementally improves its answers and avoids past pitfalls. Any more advanced self-evolution (like rewriting its own goals or adding new skills) would currently have to be implemented by the developer on top of the provided memory mechanisms.
+Google Agent Development Kit (ADK)
+Memory Handling: Google’s ADK (often used with Vertex AI) approaches agent memory via the concepts of session state and memory services. A session in ADK represents one contiguous interaction (e.g. a chat session) and includes a history of events (messages) and a modifiable state (key–value memory within that conversation)
+. This is essentially short-term memory: the agent’s immediate context for the current conversation. ADK’s session state can track things like the user’s name or progress through a task within that session
+. By default, this short-term memory lives in-memory (RAM) and is lost when the session ends or the server restarts
+. However, ADK provides a SessionService that can be backed by a database to persist session data if needed (for production deployments)
+. ADK even has “magic” prefixes for state keys (like user:, app:) that allow certain pieces of state to persist across sessions, e.g. a user’s setting that should apply every time
+. This bridges short-term and long-term a bit by letting some session data become semi-permanent. For true long-term memory, ADK offers the MemoryService abstraction
+. There are two implementations:
+In-Memory MemoryService: Simply stores all past session transcripts in memory for search. This is mainly for prototyping – it retains full conversation logs (raw chat history) and only supports basic keyword search for retrieval
+. It’s akin to a naive episodic memory: the agent can query past chats by keyword, but there’s no intelligent processing of those logs.
+Vertex AI Memory Bank Service: This is a more advanced, cloud-managed memory. The Memory Bank uses a large model (Google’s Gemini model) to extract meaningful information from conversations and store those distilled “memories” in a persistent store
+. In other words, instead of keeping full transcripts, it picks out the key facts or outcomes (a semantic summary) and accumulates those. The agent can later query this memory by using a semantic search interface – the Memory Bank supports vector similarity search over the stored memories
+. For example, if across chats the user mentioned their favorite color or a specific problem, the Memory Bank would have a record of that fact which can be retrieved even in a new session. This corresponds to semantic memory (facts about the user or context) gleaned from episodic interactions. It’s also a form of long-term episodic memory, since it keeps track of what happened “many conversations ago,” but in a summarized way.
+Using the MemoryService, an ADK agent can automatically save a session to long-term memory (usually at the end of the session) and later load relevant info when a new session starts or when needed
+. In practice, developers set up a callback or configuration so that once a conversation is done, the agent calls add_session_to_memory() to ingest that session’s info into the Memory Bank
+. When the agent needs to answer a question in a new session, it can call a memory tool (like load_memory) or a search function to retrieve any matching facts from the Memory Bank
+. The retrieved snippets are then added to the prompt so the agent “recalls” them. This design cleanly separates short-term vs. long-term: short-term is the session (transient but can be DB-backed), and long-term is the Memory Bank (persistent and summarized). Memory Types: While ADK’s documentation doesn’t explicitly label memory as semantic/episodic/procedural, we can map them. Semantic memory is represented by the distilled facts in Memory Bank (it stores general knowledge the agent learned about the user or context, not entire episodes)
+. Episodic memory is present in that the agent can refer to specific past events, but typically via the semantic extraction (for example, “what was the user’s score last session?” would be stored as a fact). If needed, one could use raw transcripts (episodic) via the in-memory service, but that’s less scalable. Procedural memory (rules for task execution) is not really handled by ADK automatically – the agent’s “skills” or behaviors are defined by its prompt and code. ADK is more about orchestration, so it doesn’t have a built-in mechanism for an agent to learn new procedures on its own. Developers would have to update the agent’s prompt or give it new tools (skills) if they want to change its procedural knowledge. Self-Improvement & Evolution: Google’s ADK enables continuous improvement mainly through better context and personalization. By using the Memory Bank, an agent can learn from past conversations – e.g. remembering a user’s preferences, past issues, or progress – which makes future interactions more personalized and efficient
+. For instance, an agent could gradually build a profile of a student’s learning difficulties and adapt its tutoring strategy accordingly in subsequent sessions
+. This is a form of self-improvement, albeit guided by the developer’s setup of what to store. The agent is not rewriting its own code or prompt, but it is improving its answers by having access to a growing knowledge base of prior interactions. The Memory Bank’s use of AI to summarize means the agent’s long-term memory stays concise and focused, avoiding overwhelming the model with too much irrelevant old context
+. In terms of agent evolution, ADK’s philosophy is to give the agent the right information rather than change the agent’s inherent reasoning abilities. There is no built-in analog of a prompt optimizer or reflective loop in ADK as of now. However, a developer could manually analyze stored conversations and fine-tune the model or adjust prompts externally. To summarize, ADK’s agent evolution through memory manifests as better contextual awareness and personalization over time (the agent “remembers you”), rather than the agent autonomously learning entirely new behaviors.
+Comparison of Framework Memory Features
+The table below summarizes how each framework addresses different memory types and agent learning:
+Framework	Short-Term Memory (within session)	Long-Term Memory (across sessions)	Semantic vs Episodic Memory	Procedural Memory (skills/rules)	Self-Improvement Mechanisms
+Claude Agent SDK	Conversation context (limited by context window)
+. Optionally uses compaction (summaries) to not exceed window
+.	Memory Tool for persistence
+ – reads/writes files to retain info between runs. Developer can store notes, logs, etc.	No explicit built-in separation; can emulate episodic memory via logs (e.g. progress.txt) and semantic memory by saving extracted facts in files.	LLM’s behavior guided by prompt; no auto-update of rules. Procedural knowledge must be given by developer (or via fine-tuning).	Learns from past via memory files: next session reads what previous session left
+. Reduces forgetting by carrying over important context
+. No built-in prompt learning loop.
+LangChain LangGraph	Thread-scoped state stored via checkpointing
+. Maintains full message history (pruned or filtered if needed) in a conversation thread.	LangMem stores long-term data in custom namespaces
+. Supports persistent vector stores or databases for memories accessible in any session.	Explicit types: Semantic memory for facts (e.g. user profile)
+, Episodic for past examples
+, Procedural for learned rules
+. Each handled via specialized APIs (extractors, prompt updates, etc.).	Yes – Procedural memory via prompt updates. LangMem can refine the agent’s system prompt (rules) from interaction feedback
+, effectively letting the agent evolve its skills.	Built-in support for lifelong learning: can update memory on-the-fly or in background
+. Prompt optimization allows the agent to improve behavior after failures
+. Memories (facts/examples) accumulated to avoid relearning things
+.
+CrewAI	Short-term context with RAG: recent messages/results embedded in ChromaDB for retrieval
+. Provides continuity in ongoing tasks.	Long-term SQLite DB to save past task outcomes, insights
+. Ensures knowledge is retained across runs. Also entity memory database for persistent info on specific entities
+.	Not distinctly labeled, but semantic knowledge is captured in entity memory (facts about people, etc.) and an optional knowledge base. Episodic info is in long-term storage (records of completed tasks = past experiences).	No direct mechanism to alter agent’s core logic. The agent’s “skills” (tools, etc.) are defined in code. Procedural knowledge can be encoded in prompt or tools, but not learned on its own.	Incremental learning by accumulation: Every run can add to long-term memory, so agent references past successes to improve future decisions. If paired with external memory (e.g. Mem0), can adapt to user’s patterns (personalization) over time
+. No autonomous policy revision, but avoids repeating mistakes by remembering prior outcomes.
+Google ADK	Session state and event history
+. Can persist session via DB to survive restarts
+. By default isolated per session unless using special keys to carry over small pieces
+.	MemoryService provides long-term memory. In-memory variant (non-persistent) stores raw chat logs (for prototyping)
+. Vertex AI Memory Bank (persistent) stores extracted key info with semantic search
+.	Semantic memory is achieved via Memory Bank’s distilled facts (e.g. “user’s favorite color is blue”). Episodic memory: the agent can retrieve info from specific past interactions, but mainly through the semantic lens (important events become facts).	No direct procedural memory module. The agent’s methods are static (defined by developer prompts and available tools). ADK does not let the agent rewrite its skill set on its own.	Personalization and context continuity: agent “remembers” user-specific details across sessions with Memory Bank
+. Improves responses by recalling past interactions (e.g. avoids repeating explanations). No built-in self-tuning of prompts or model behavior. Any policy improvements require external intervention (developer updates or fine-tuning).
+Standalone Memory Systems and Integration
+Beyond the frameworks’ native capabilities, developers often integrate dedicated memory services or libraries into agent workflows. These standalone memory systems focus on providing extended long-term memory, personalization, or advanced retrieval that can plug into any agentic framework. We will look at Mem0, Letta, Zep, and LangMem (SDK) – what they offer independently and how they can be used in agent architectures.
+Mem0
+Mem0 (pronounced “mem-zero”) is a memory layer designed for long-lived AI assistants with personalization. It treats memory as a first-class component. Mem0’s approach is to infer and store user-specific knowledge from interactions. For example, Mem0 will pick up on patterns like “the user usually prefers reminders at 8 PM” or “they tend to snooze work tasks by 15 minutes”
+. It separates the notion of application state (e.g. the list of reminders in a to-do app) from personalization memory (the user’s habits, preferences, and history). In practice, Mem0 uses an LLM under the hood to analyze conversation and usage data and produce structured memory entries. These can be things like preferences (explicit facts about the user) and behavior summaries (statistical or high-level observations about user behavior)
+. Mem0 then stores these memories in a database or vector store (Mem0 supports various backends like Qdrant for vectors, with OpenAI or other embedder models)
+. Because Mem0 auto-categorizes information, developers can define memory categories – for instance, “personal_information” or custom domains – and Mem0 will file inferred facts accordingly
+. As an independent tool, Mem0 provides an API (and Python client) where you feed in events (e.g. conversations, user actions) and it updates the memory store. You can then query Mem0 for relevant context to inject into the agent’s prompt. The integration is straightforward: frameworks like CrewAI have a built-in connector for Mem0
+, and one can similarly integrate Mem0 into LangChain or Claude by treating it as an external knowledge source. In the Claude RecallAgent example from Mem0’s blog, they combined Claude’s Agent SDK with Mem0: Claude handled the dialogue and tool use, while Mem0 supplied a “mem0_context” object containing the user’s preferences and recent behavior stats to enrich Claude’s prompt
+. This resulted in an agent that adapts its suggestions based on the user’s learned habits – for instance, proactively suggesting a reminder time the user often prefers
+. Memory Types: Mem0 excels at semantic and episodic memory fusion. It keeps raw logs (episodic data) but crucially derives semantic memories (facts like “User is a morning person”) from them. It doesn’t explicitly store step-by-step episodes for the agent to read; rather it condenses them into useful knowledge chunks. Mem0’s memory model can be seen as a form of long-term semantic memory with personalization focus. It likely does not handle procedural memory (it won’t change the agent’s toolset or rules), but it can certainly inform the agent’s procedure by, say, indicating how the agent should tailor its behavior to the user (which the agent’s prompt can incorporate). Agent Evolution: Using Mem0 can drive agent evolution through personalization. Over weeks or months, an agent using Mem0 becomes increasingly fine-tuned to the user: it remembers what the user has done, likes, or struggles with, without forgetting older context (since Mem0 persists it). This means the agent’s responses and suggestions improve (more relevant, less repetitive) and the agent “learns” in a non-destructive way (Mem0 archives old info rather than losing it)
+. One key point: Mem0 aims to “remember without hallucinating”
+ – by grounding memories in a database, the agent knows where to look up factual info (e.g. whether a reminder is active or done) rather than guessing. In summary, Mem0 used alongside an agent framework provides a robust long-term memory store that augments the agent’s built-in memory with deep personalization, enabling the agent to adapt its behavior while maintaining reliability.
+Letta
+Letta is an AI agent platform with a sophisticated built-in memory architecture (as described in Letta’s blog). It can be viewed as both an independent system and a reference design for memory management. Letta’s memory system is composed of multiple layers:
+Message Buffer (Recent Memory): This holds the last few turns of conversation – essentially the agent’s short-term working memory
+. In Letta, agents run in a single perpetual thread of dialogue, meaning the conversation isn’t reset between sessions. The message buffer ensures immediate context is on hand to maintain a coherent dialogue flow.
+Core Memory (In-Context Blocks): These are dedicated memory blocks pinned in the prompt context that the agent or other helper agents manage
+. Each block has a specific focus (for example, a “User Profile” block with the user’s preferences, an “Agent Persona” block defining its identity, or a “Current Task” block). Core memory blocks are essentially editable slots of context that remain in the prompt. The agent can update these via tools (e.g. an agent might have a tool to update the “user_preferences” block if it learns something new)
+. They provide structured, immediately accessible memory that doesn’t rely on retrieval – it’s analogous to giving the agent a scratchpad or notes within its context window.
+Recall Memory (Full History): This is a complete log of all interactions that is stored persistently (on disk/database)
+. The recall memory is not continuously in the prompt, but it’s searchable. So if the agent needs to recall something not in the recent buffer, it can query the recall log. Letta automates saving this history; other frameworks might require manual handling to persist chat transcripts
+. Recall memory is essentially episodic memory: a record of everything that happened, which can be retrieved on demand.
+Archival Memory (Knowledge Store): This is an external, structured store of processed knowledge
+. Unlike recall (raw logs), archival memory consists of indexed facts, concepts, or summary information gleaned from the agent’s experience or provided data. This could be a vector database of facts, a graph database of relationships, or any knowledge base the agent can query during conversations
+. Archival memory is akin to semantic memory – it holds distilled knowledge the agent has explicitly learned or was given, separate from the transient conversation flow.
+The Letta design also involves techniques to manage these memories, like message eviction & summarization (compressing old dialogue when the context window is full)
+ and recursive summarization (iteratively summarizing older content to keep summaries concise). It even suggests a concept of “sleep-time agents” – background agents that, when the main agent is idle, will reorganize and optimize its memory (e.g. improve summaries, consolidate blocks)
+. This is a novel idea for agent evolution: the agent’s memory gets refined asynchronously, leading to higher quality long-term memory without burdening the main conversation. As an independent tool, Letta’s memory components aren’t (to public knowledge) packaged as a library you can plug into any agent – rather, they are part of Letta’s own agent platform. However, one can integrate similar ideas: for example, implementing a single-thread conversation in something like LangChain to mimic the perpetual thread, or using multiple prompt segments (like LangChain’s Memory Components in chains) to simulate core memory blocks. Letta’s concept of recall vs. archival memory provides insight on how to design memory: raw history vs processed knowledge. Developers of other agents can similarly maintain a log and a distilled fact store. Letta shows that while human memory terms (procedural, episodic, semantic) are useful, practical agent memory might be organized by function (recent vs. long-term, raw vs. processed)
+. Skills vs Memory in Letta: Not explicitly mentioned, but Letta’s approach suggests a difference: memory is the information store, whereas skills (or tools) would be things like the ability to manage memory blocks or perform searches. For instance, an agent might have a “UpdateMemoryBlock” skill – that’s a procedure – separate from the memory itself which is just data. Agent Evolution: Letta’s asynchronous memory management hints at self-improvement. By having specialized processes update and optimize the agent’s memory, the agent effectively learns better representations of past knowledge over time (e.g. better summaries). This means the agent’s long-term memory becomes more accurate and efficient, which should improve its performance. Letta also indicates that with persistent recall, the agent won’t forget details unless intentionally evicted – so it can maintain consistency over very long periods (useful for an agent that a user interacts with over months). Although Letta’s blog emphasizes context engineering (as opposed to directly emulating brain-like memory)
+, the result is an agent that can learn through experience: it updates its memory blocks as it gains new info and uses external storage to augment its limited context window
+. In short, Letta’s independent memory model demonstrates that an agent can be designed to continuously integrate new knowledge and maintain important old knowledge, leading to an evolving capability without retraining the core model.
+Zep
+Zep is a standalone “context engineering” and memory platform for AI agents. It is built to address the common failure mode of agents: lack of the right context
+. Zep takes in all kinds of data – chat conversations, user events, documents – and builds a unified, evolving knowledge graph out of them
+. In Zep’s architecture:
+Ingestion: As new data comes in (e.g. a user says something, or an external event occurs), Zep extracts entities, facts, and relationships from it
+. This is done automatically using NLP/LLM techniques. For example, if a user says “I moved my meeting to 3 PM,” Zep might extract an entity “meeting” with a fact “scheduled at 3 PM” and a relationship to the user.
+Temporal Knowledge Graph: Zep organizes extracted information into a graph that has a time dimension
+. Each fact or entity state is stored with validity timestamps (“from X to Y this was true”)
+. When facts change (e.g. an address is updated, an order status changes), Zep does fact invalidation, meaning it marks the old fact as expired and the new fact as current
+. This is powerful for ensuring the agent’s memory isn’t cluttered with outdated or contradictory info – it knows the timeline.
+Assembly/Retrieval: When an agent needs context, it queries Zep (usually with the current conversation or a specific query). Zep then retrieves the relevant nodes from the graph and assembles a context document for the agent
+. This assembly can include the user’s traits, recent relevant interactions, and any pertinent business or world knowledge, formatted in a concise way
+. The idea is to give the agent exactly the information it needs at that moment, with each fact justified by source and time.
+As an independent service, Zep provides a simple API/SDK. In a typical integration, an agent developer would send each new message or event to Zep via client.thread.add_messages(...) and Zep returns a context (which can be directly inserted into the prompt)
+. The returned context, as shown in Zep’s example, could read like a summary: e.g. a user profile (“Emily is a user who does X, recently had issue Y...”) followed by a list of relevant facts with dates
+. The agent then gets a turn-by-turn updated memory without manually searching a vector DB or maintaining its own long-term store – Zep handles it. Zep is designed to work with any framework (LangChain, etc.) with minimal code, and it emphasizes speed (sub-200ms retrieval so it can be used in real-time applications)
+. Memory Types: Zep’s approach blurs semantic and episodic memory in a beneficial way. It stores episodic events (conversations, transactions) but converts them into semantic form (facts, structured knowledge in the graph). Because it keeps the temporal aspect, one can consider it maintaining an episodic timeline of facts. It’s particularly well-suited to domains where facts update (like user state, CRM data) – a strength in enterprise settings. Zep does not inherently handle “procedural memory” (it’s not about teaching the agent new skills), but it can store procedures as knowledge if expressed in text or data (for instance, it could store that “the procedure to reset a password was done at time X” – a fact, but it won’t rewrite how the agent executes it). Agent Evolution: By using Zep, an agent effectively gains a dynamic, self-maintaining memory. The agent doesn’t need to explicitly summarize or categorize its experiences; Zep does that in the background by updating the knowledge graph. This means over time the agent’s knowledge of the user and environment becomes richer and more up-to-date without manual intervention. The agent is far less likely to fail due to missing context – as Zep’s site puts it, agents fail not because the model is bad but because they lack context
+. Zep ensures the agent always has the right context assembled from all relevant sources, thereby improving its performance and reliability. It’s a form of automatic continuous learning: every interaction literally updates the graph memory. For example, if yesterday the user said “I love Adidas shoes” and today asks for shoe recommendations, Zep would surface the fact “User favors Adidas” so the agent can tailor its answer – demonstrating learning of user preference (semantic memory) from an episodic event. In conclusion, Zep as a standalone memory system can be plugged into agent frameworks to supercharge their memory: the agent focuses on reasoning and tool use, while Zep feeds it an evolving knowledge base to reason over. This significantly aids long-term coherence, personalization, and the agent’s ability to handle changing information
+.
+LangMem SDK (Standalone Usage)
+We discussed LangChain’s LangMem in the context of LangGraph, but it’s worth noting that LangMem is envisioned as a somewhat framework-agnostic memory SDK too. It can be treated as a standalone library to add long-term memory to agents. If you are not using the full LangGraph, you could still use LangMem’s components:
+The semantic memory extractor (MemoryManager) to automatically parse conversations and pull out facts to store
+.
+The prompt optimizer to improve procedural knowledge by reflecting on dialogue trajectories
+.
+Methods to save and retrieve memories by namespace, which you can integrate with your own state management
+.
+In other words, LangMem can serve as an external memory module (similar to Mem0 or Zep) if you hook it into your agent: after each interaction, run the memory update routines; before each interaction, fetch relevant stored memory. LangMem emphasizes the trio of semantic, episodic, procedural: it is one of the few solutions explicitly aiming to cover all three. For example, you could integrate LangMem in a custom agent to store a user profile (semantic), store distilled dialogues as examples (episodic), and periodically refine the agent prompt (procedural)
+. This holistic approach means the agent not only remembers facts and events but also improves its base behavior. As an independent tool, LangMem is still emerging (the LangChain blog indicates it’s under active development and they invite teams to try it)
+. It likely plugs into LangChain’s own ecosystem (e.g. LangSmith observability) more easily, but in principle one could use LangMem’s algorithms with, say, the Claude SDK or Google ADK by writing some glue code. The benefit would be to get a ready-made solution for memory types: for instance, using LangMem to manage an agent’s long-term knowledge store instead of writing custom logic. Agent Evolution: Using LangMem outside LangChain would still bring the same advantage: the agent can learn from feedback and adapt. For example, consider integrating LangMem with Claude – you might capture Claude’s mistakes and successes in a log, run LangMem’s prompt optimizer to adjust Claude’s system prompt (procedural memory updated), and store new facts Claude learned in an external DB (semantic memory). Over time, even a Claude-based agent could become more specialized to its user or task, without retraining. LangMem’s episodic memory concept (turning specific past cases into few-shot examples) can also boost performance by essentially fine-tuning via examples at inference time. In summary, LangMem (as an SDK) provides a blueprint to incorporate human-like memory facets into any agent workflow. It underlines the difference between just storing data and truly using it for improvement: semantic memory for knowledge accumulation, episodic for learning from cases, and procedural for updating the agent’s “skills” or policies. This makes it a comprehensive standalone memory solution that, much like others, can be integrated into agentic systems to extend their memory and learning capabilities beyond what they offer out-of-the-box.
+Skills vs. Memory in Agent Frameworks
+In the context of these frameworks, it’s important to distinguish “skills” (or tools) from “memory.” Although both contribute to an agent’s effectiveness, they are fundamentally different components:
+Skills (Tools/Actions): Skills are the capabilities or actions an agent can execute. These are often implemented as API calls, function executions, or predefined procedures that the agent can invoke when needed. For example, a skill might be “Search the web,” “Do math calculation,” “Query a database,” or “Send an email.” In LangChain and Claude, these are referred to as tools; in Google’s ADK, they’re simply agent functions or external calls. Skills are typically static or coded: the developer defines what tools are available and how they work. They represent procedural knowledge in the sense of how to do something, but the agent doesn’t “remember” a skill – it either has it or not by design. For instance, the Sierra agent framework (noted by LangChain’s blog) allows developers to compose skills to express procedural knowledge – meaning the developer programs the procedures the agent can use
+. Thus, skills are about action and ability. If an agent is a robot, skills are like its built-in functions or programs.
+Memory: Memory, on the other hand, is about information retention. It’s the agent’s store of knowledge and past experience. Memory does not directly perform actions; instead, it informs the agent’s decisions by providing context. For example, an agent’s memory might contain “User’s name is Alice and she likes sci-fi genre” or “We solved problem X last week using method Y.” This information can influence the agent’s responses (personalizing them or avoiding repeating past mistakes). Memory can be short-term (only recent info) or long-term (persisted facts and histories). Unlike skills, memory content is typically dynamic – it grows and changes as the agent interacts and learns. Memory answers the question “What does the agent know?” (or remember), whereas skills answer “What can the agent do?”.
+All the frameworks we discussed keep this separation. For instance, in Claude’s Agent SDK, one defines a set of tools (skills) the agent can call (e.g. a calculator, or the memory tool itself)
+. Separately, the memory tool stores data but doesn’t execute anything on its own – the agent must decide to use the “memory” skill to read/write it. In LangChain, tools are functions the agent can use during its reasoning loop, while memory is part of the agent’s state that gets injected into the prompt. In CrewAI, you also define tools in the Agent (like file operations, web requests, etc.), and memory is handled by the framework in the background unless the agent specifically queries it. Google’s ADK similarly has a library of tools and a separate memory service – using memory might itself be implemented as a tool (e.g. ADK provides a load_memory tool for the agent to query its MemoryService)
+. Differences in practice: A skill is often invoked when the agent’s reasoning determines “I need to perform X action now.” Memory comes into play either implicitly (through the context given to the model) or explicitly when the agent thinks “I should check if I know something about this from before.” Some frameworks blur the line by making memory retrieval an automated step. For example, Zep automatically provides context – the agent doesn’t call a “remember” tool, Zep just augments the prompt. But conceptually, the agent gained no new skill; it’s simply being fed information. The skill in that case was on the developer’s side – integrating Zep – not the agent’s cognitive repertoire. Procedural Memory vs Skills: There is a subtle overlap: procedural memory in humans is knowing how to do things (ride a bike, etc.), which in agents corresponds to skills or policies. When LangChain updates procedural memory by changing the prompt with new instructions, you could say the agent “learned a new skill” (or refined a skill) in a limited way. But generally, frameworks treat skills as fixed primitives and don’t let agents create entirely new tools at runtime. An agent can learn when or how to better use its skills (through memory of outcomes), but not invent new API calls on the fly. For instance, an agent might remember “the last time I used the ‘translate’ tool, the user was happy” – that memory might make it use that tool more readily (a kind of learned strategy). The skill (translate tool) was always there; memory just provided guidance. In summary, skills are the actions an agent is equipped to take, while memory is the knowledge an agent retains. A well-designed agent needs both: skills to interact with the world or perform computations, and memory to inform those actions with context and experience. The balance and interplay are evident in all frameworks – they provide tool APIs for skills and memory modules for knowledge. A change in memory (say, adding a new fact) can immediately influence an agent’s output, whereas adding a new skill might enable entirely new capabilities. Conversely, memory decay or loss can make the agent forget context, while lack of a certain skill means the agent is incapable of a class of actions (no matter how much it remembers). Understanding this distinction helps developers decide how to improve an agent: e.g. add memory if the agent is forgetful or not learning from the past, vs. add skills if the agent is missing functionality. Both are crucial for creating sophisticated, continually learning agents that can not only recall information but also execute complex sequences to achieve goals.
+Citations
+
+Effective harnesses for long-running agents \ Anthropic
+
+https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents
+
+Memory tool - Claude API Docs
+
+https://platform.claude.com/docs/en/agents-and-tools/tool-use/memory-tool
+
+Memory tool - Claude API Docs
+
+https://platform.claude.com/docs/en/agents-and-tools/tool-use/memory-tool
+
+Effective harnesses for long-running agents \ Anthropic
+
+https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents
+
+Memory tool - Claude API Docs
+
+https://platform.claude.com/docs/en/agents-and-tools/tool-use/memory-tool
+
+Effective harnesses for long-running agents \ Anthropic
+
+https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents
+
+Memory overview - Docs by LangChain
+
+https://docs.langchain.com/oss/python/langgraph/memory
+
+Memory overview - Docs by LangChain
+
+https://docs.langchain.com/oss/python/langgraph/memory
+
+Memory overview - Docs by LangChain
+
+https://docs.langchain.com/oss/python/langgraph/memory
+
+Memory overview - Docs by LangChain
+
+https://docs.langchain.com/oss/python/langgraph/memory
+
+LangMem SDK for agent long-term memory
+
+https://blog.langchain.com/langmem-sdk-launch/
+
+LangMem SDK for agent long-term memory
+
+https://blog.langchain.com/langmem-sdk-launch/
+
+LangMem SDK for agent long-term memory
+
+https://blog.langchain.com/langmem-sdk-launch/
+
+LangMem SDK for agent long-term memory
+
+https://blog.langchain.com/langmem-sdk-launch/
+
+LangMem SDK for agent long-term memory
+
+https://blog.langchain.com/langmem-sdk-launch/
+
+LangMem SDK for agent long-term memory
+
+https://blog.langchain.com/langmem-sdk-launch/
+
+Memory overview - Docs by LangChain
+
+https://docs.langchain.com/oss/python/langgraph/memory
+
+Memory overview - Docs by LangChain
+
+https://docs.langchain.com/oss/python/langgraph/memory
+
+Memory overview - Docs by LangChain
+
+https://docs.langchain.com/oss/python/langgraph/memory
+
+LangMem SDK for agent long-term memory
+
+https://blog.langchain.com/langmem-sdk-launch/
+
+LangMem SDK for agent long-term memory
+
+https://blog.langchain.com/langmem-sdk-launch/
+
+Memory - CrewAI
+
+https://docs.crewai.com/en/concepts/memory
+
+Memory - CrewAI
+
+https://docs.crewai.com/en/concepts/memory
+
+Memory - CrewAI
+
+https://docs.crewai.com/en/concepts/memory
+
+Memory - CrewAI
+
+https://docs.crewai.com/en/concepts/memory
+
+Memory - CrewAI
+
+https://docs.crewai.com/en/concepts/memory
+
+Memory - CrewAI
+
+https://docs.crewai.com/en/concepts/memory
+
+Memory - CrewAI
+
+https://docs.crewai.com/en/concepts/memory
+
+Memory - CrewAI
+
+https://docs.crewai.com/en/concepts/memory
+
+Memory - CrewAI
+
+https://docs.crewai.com/en/concepts/memory
+
+Building Memory-First AI Reminder Agents with Mem0 and Claude Agent SDK
+
+https://mem0.ai/blog/building-a-reminder-agent-that-actually-remembers
+
+Building Memory-First AI Reminder Agents with Mem0 and Claude Agent SDK
+
+https://mem0.ai/blog/building-a-reminder-agent-that-actually-remembers
+
+Remember this: Agent state and memory with ADK | Google Cloud Blog
+
+https://cloud.google.com/blog/topics/developers-practitioners/remember-this-agent-state-and-memory-with-adk
+
+Remember this: Agent state and memory with ADK | Google Cloud Blog
+
+https://cloud.google.com/blog/topics/developers-practitioners/remember-this-agent-state-and-memory-with-adk
+
+Remember this: Agent state and memory with ADK | Google Cloud Blog
+
+https://cloud.google.com/blog/topics/developers-practitioners/remember-this-agent-state-and-memory-with-adk
+
+Remember this: Agent state and memory with ADK | Google Cloud Blog
+
+https://cloud.google.com/blog/topics/developers-practitioners/remember-this-agent-state-and-memory-with-adk
+
+Remember this: Agent state and memory with ADK | Google Cloud Blog
+
+https://cloud.google.com/blog/topics/developers-practitioners/remember-this-agent-state-and-memory-with-adk
+
+Remember this: Agent state and memory with ADK | Google Cloud Blog
+
+https://cloud.google.com/blog/topics/developers-practitioners/remember-this-agent-state-and-memory-with-adk
+
+Remember this: Agent state and memory with ADK | Google Cloud Blog
+
+https://cloud.google.com/blog/topics/developers-practitioners/remember-this-agent-state-and-memory-with-adk
+
+Remember this: Agent state and memory with ADK | Google Cloud Blog
+
+https://cloud.google.com/blog/topics/developers-practitioners/remember-this-agent-state-and-memory-with-adk
+
+Memory - Agent Development Kit
+
+https://google.github.io/adk-docs/sessions/memory/
+
+Remember this: Agent state and memory with ADK | Google Cloud Blog
+
+https://cloud.google.com/blog/topics/developers-practitioners/remember-this-agent-state-and-memory-with-adk
+
+Memory - Agent Development Kit
+
+https://google.github.io/adk-docs/sessions/memory/
+
+Remember this: Agent state and memory with ADK | Google Cloud Blog
+
+https://cloud.google.com/blog/topics/developers-practitioners/remember-this-agent-state-and-memory-with-adk
+
+Memory - Agent Development Kit
+
+https://google.github.io/adk-docs/sessions/memory/
+
+Remember this: Agent state and memory with ADK | Google Cloud Blog
+
+https://cloud.google.com/blog/topics/developers-practitioners/remember-this-agent-state-and-memory-with-adk
+
+Remember this: Agent state and memory with ADK | Google Cloud Blog
+
+https://cloud.google.com/blog/topics/developers-practitioners/remember-this-agent-state-and-memory-with-adk
+
+Memory - Agent Development Kit
+
+https://google.github.io/adk-docs/sessions/memory/
+
+Remember this: Agent state and memory with ADK | Google Cloud Blog
+
+https://cloud.google.com/blog/topics/developers-practitioners/remember-this-agent-state-and-memory-with-adk
+
+Remember this: Agent state and memory with ADK | Google Cloud Blog
+
+https://cloud.google.com/blog/topics/developers-practitioners/remember-this-agent-state-and-memory-with-adk
+
+Remember this: Agent state and memory with ADK | Google Cloud Blog
+
+https://cloud.google.com/blog/topics/developers-practitioners/remember-this-agent-state-and-memory-with-adk
+
+Remember this: Agent state and memory with ADK | Google Cloud Blog
+
+https://cloud.google.com/blog/topics/developers-practitioners/remember-this-agent-state-and-memory-with-adk
+
+Remember this: Agent state and memory with ADK | Google Cloud Blog
+
+https://cloud.google.com/blog/topics/developers-practitioners/remember-this-agent-state-and-memory-with-adk
+
+Remember this: Agent state and memory with ADK | Google Cloud Blog
+
+https://cloud.google.com/blog/topics/developers-practitioners/remember-this-agent-state-and-memory-with-adk
+
+Memory overview - Docs by LangChain
+
+https://docs.langchain.com/oss/python/langgraph/memory
+
+Memory - CrewAI
+
+https://docs.crewai.com/en/concepts/memory
+
+Remember this: Agent state and memory with ADK | Google Cloud Blog
+
+https://cloud.google.com/blog/topics/developers-practitioners/remember-this-agent-state-and-memory-with-adk
+
+Building Memory-First AI Reminder Agents with Mem0 and Claude Agent SDK
+
+https://mem0.ai/blog/building-a-reminder-agent-that-actually-remembers
+
+Building Memory-First AI Reminder Agents with Mem0 and Claude Agent SDK
+
+https://mem0.ai/blog/building-a-reminder-agent-that-actually-remembers
+
+Building Memory-First AI Reminder Agents with Mem0 and Claude Agent SDK
+
+https://mem0.ai/blog/building-a-reminder-agent-that-actually-remembers
+
+Memory - CrewAI
+
+https://docs.crewai.com/en/concepts/memory
+
+Memory - CrewAI
+
+https://docs.crewai.com/en/concepts/memory
+
+Memory - CrewAI
+
+https://docs.crewai.com/en/concepts/memory
+
+Memory - CrewAI
+
+https://docs.crewai.com/en/concepts/memory
+
+Building Memory-First AI Reminder Agents with Mem0 and Claude Agent SDK
+
+https://mem0.ai/blog/building-a-reminder-agent-that-actually-remembers
+
+Building Memory-First AI Reminder Agents with Mem0 and Claude Agent SDK
+
+https://mem0.ai/blog/building-a-reminder-agent-that-actually-remembers
+
+Building Memory-First AI Reminder Agents with Mem0 and Claude Agent SDK
+
+https://mem0.ai/blog/building-a-reminder-agent-that-actually-remembers
+
+Agent Memory: How to Build Agents that Learn and Remember | Letta
+
+https://www.letta.com/blog/agent-memory
+
+Agent Memory: How to Build Agents that Learn and Remember | Letta
+
+https://www.letta.com/blog/agent-memory
+
+Agent Memory: How to Build Agents that Learn and Remember | Letta
+
+https://www.letta.com/blog/agent-memory
+
+Agent Memory: How to Build Agents that Learn and Remember | Letta
+
+https://www.letta.com/blog/agent-memory
+
+Agent Memory: How to Build Agents that Learn and Remember | Letta
+
+https://www.letta.com/blog/agent-memory
+
+Agent Memory: How to Build Agents that Learn and Remember | Letta
+
+https://www.letta.com/blog/agent-memory
+
+Agent Memory: How to Build Agents that Learn and Remember | Letta
+
+https://www.letta.com/blog/agent-memory
+
+Agent Memory: How to Build Agents that Learn and Remember | Letta
+
+https://www.letta.com/blog/agent-memory
+Making Sense of Memory in AI Agents - Leonie Monigatti
+
+https://www.leoniemonigatti.com/blog/memory-in-ai-agents.html
+
+Agent Memory: How to Build Agents that Learn and Remember | Letta
+
+https://www.letta.com/blog/agent-memory
+
+Agent Memory: How to Build Agents that Learn and Remember | Letta
+
+https://www.letta.com/blog/agent-memory
+
+Agent Memory: How to Build Agents that Learn and Remember | Letta
+
+https://www.letta.com/blog/agent-memory
+
+Agent Memory: How to Build Agents that Learn and Remember | Letta
+
+https://www.letta.com/blog/agent-memory
+
+Context Engineering & Agent Memory Platform for AI Agents - Zep
+
+https://www.getzep.com/
+
+Context Engineering & Agent Memory Platform for AI Agents - Zep
+
+https://www.getzep.com/
+
+Context Engineering & Agent Memory Platform for AI Agents - Zep
+
+https://www.getzep.com/
+
+Context Engineering & Agent Memory Platform for AI Agents - Zep
+
+https://www.getzep.com/
+
+Context Engineering & Agent Memory Platform for AI Agents - Zep
+
+https://www.getzep.com/
+
+Context Engineering & Agent Memory Platform for AI Agents - Zep
+
+https://www.getzep.com/
+
+Context Engineering & Agent Memory Platform for AI Agents - Zep
+
+https://www.getzep.com/
+
+Context Engineering & Agent Memory Platform for AI Agents - Zep
+
+https://www.getzep.com/
+
+Context Engineering & Agent Memory Platform for AI Agents - Zep
+
+https://www.getzep.com/
+
+Context Engineering & Agent Memory Platform for AI Agents - Zep
+
+https://www.getzep.com/
+
+Context Engineering & Agent Memory Platform for AI Agents - Zep
+
+https://www.getzep.com/
+
+Context Engineering & Agent Memory Platform for AI Agents - Zep
+
+https://www.getzep.com/
+
+Context Engineering & Agent Memory Platform for AI Agents - Zep
+
+https://www.getzep.com/
+
+Context Engineering & Agent Memory Platform for AI Agents - Zep
+
+https://www.getzep.com/
+
+Context Engineering & Agent Memory Platform for AI Agents - Zep
+
+https://www.getzep.com/
+
+LangMem SDK for agent long-term memory
+
+https://blog.langchain.com/langmem-sdk-launch/
+
+LangMem SDK for agent long-term memory
+
+https://blog.langchain.com/langmem-sdk-launch/
+
+How to think about agent frameworks
+
+https://blog.langchain.com/how-to-think-about-agent-frameworks/
+
+Building Memory-First AI Reminder Agents with Mem0 and Claude Agent SDK
+
+https://mem0.ai/blog/building-a-reminder-agent-that-actually-remembers
+
+Building Memory-First AI Reminder Agents with Mem0 and Claude Agent SDK
+
+https://mem0.ai/blog/building-a-reminder-agent-that-actually-remembers
+
+Memory - Agent Development Kit
+
+https://google.github.io/adk-docs/sessions/memory/
+
+Memory - Agent Development Kit
+
+https://google.github.io/adk-docs/sessions/memory/
+All Sources
+
+anthropic
+
+platform.claude
+
+docs.langchain
+
+blog.langchain
+
+docs.crewai
+
+mem0
+
+cloud.google
+
+google.github
+
+letta
+leoniemonigatti
+
+getzep
