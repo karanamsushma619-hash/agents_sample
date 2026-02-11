@@ -1,70 +1,55 @@
-from __future__ import annotations
-from typing import Any, Dict
-import copy
+import json
+import inspect
 
-DRAFT_2020_12 = "https://json-schema.org/draft/2020-12/schema"
+def dump_tool_schema(tool):
+    print("\n" + "="*80)
+    print("TOOL:", getattr(tool, "name", tool))
+    print("TYPE:", type(tool))
+    print("DESC:", getattr(tool, "description", None))
 
-def _clean_json_schema(node: Any) -> Any:
-    """Remove invalid/unsupported bits for Anthropic tool schemas."""
-    if isinstance(node, dict):
-        out: Dict[str, Any] = {}
-        for k, v in node.items():
-            if v is None:
-                continue
-
-            v2 = _clean_json_schema(v)
-
-            # Drop empty combinators (Anthropic rejects anyOf: [])
-            if k in ("anyOf", "oneOf", "allOf") and (not isinstance(v2, list) or len(v2) == 0):
-                continue
-
-            # Drop enum if it's null / empty / wrong type
-            if k == "enum" and (not isinstance(v2, list) or len(v2) == 0):
-                continue
-
-            # Drop items if null/empty
-            if k == "items" and (not isinstance(v2, dict) or len(v2) == 0):
-                continue
-
-            # Drop scalar properties:{} nonsense if empty
-            if k == "properties" and isinstance(v2, dict) and len(v2) == 0:
-                continue
-
-            out[k] = v2
-        return out
-
-    if isinstance(node, list):
-        return [_clean_json_schema(x) for x in node if x is not None]
-
-    return node
-
-def _anthropic_schema_from_pydantic(model_cls: Any) -> Dict[str, Any]:
-    # Prefer v2 API when available
-    if hasattr(model_cls, "model_json_schema"):
-        raw = model_cls.model_json_schema()
-    else:
-        raw = model_cls.schema()
-
-    raw = copy.deepcopy(raw)
-    raw.setdefault("$schema", DRAFT_2020_12)
-    return _clean_json_schema(raw)
-
-def _patch_args_schema_for_anthropic(tool: Any) -> None:
-    """Force tool.args_schema.schema() to return clean 2020-12 schema."""
-    if not hasattr(tool, "args_schema") or tool.args_schema is None:
+    args_schema = getattr(tool, "args_schema", None) or getattr(tool, "args_schema_", None)
+    print("args_schema:", args_schema)
+    if args_schema is None:
+        print("No args_schema found on tool.")
         return
 
-    model_cls = tool.args_schema
+    print("args_schema type:", type(args_schema))
+    # args_schema might be a class or an instance
+    schema_obj = args_schema
 
-    # Build once to ensure it works
-    _ = _anthropic_schema_from_pydantic(model_cls)
+    # If instance, get its class
+    if not isinstance(args_schema, type):
+        schema_obj = args_schema.__class__
 
-    # Monkeypatch schema() and model_json_schema() to return cleaned dict
-    if hasattr(model_cls, "schema"):
-        model_cls.schema = classmethod(lambda cls, *a, **k: _anthropic_schema_from_pydantic(cls))
-    if hasattr(model_cls, "model_json_schema"):
-        model_cls.model_json_schema = classmethod(lambda cls, *a, **k: _anthropic_schema_from_pydantic(cls))
+    print("schema_obj:", schema_obj)
+    print("schema_obj bases:", getattr(schema_obj, "__mro__", None))
 
-# Apply patch to all MCP tools you loaded
-for t in self.tools:
-    _patch_args_schema_for_anthropic(t)
+    # Pydantic v2
+    if hasattr(schema_obj, "model_json_schema"):
+        s = schema_obj.model_json_schema()
+        print("Pydantic v2 model_json_schema(): top keys =", list(s.keys()))
+        print(json.dumps(s, indent=2)[:5000])
+        return
+
+    # Pydantic v1
+    if hasattr(schema_obj, "schema"):
+        s = schema_obj.schema()
+        print("Pydantic v1 schema(): top keys =", list(s.keys()))
+        print(json.dumps(s, indent=2)[:5000])
+        return
+
+    # Fallback: try json_schema (some libs)
+    if hasattr(schema_obj, "json_schema"):
+        s = schema_obj.json_schema()
+        print("json_schema(): top keys =", list(s.keys()))
+        print(json.dumps(s, indent=2)[:5000])
+        return
+
+    print("No known schema method found (schema/model_json_schema/json_schema).")
+
+# Dump one tool
+dump_tool_schema(tools[0])
+
+# Dump all tools
+for t in tools:
+    dump_tool_schema(t)
