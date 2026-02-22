@@ -11,16 +11,16 @@ This suggests a built-in orchestration loop that includes failure handling as pa
 The tradeoff is reduced transparency and less deterministic execution control compared to graph-based systems.
 
 **Strengths**
-
-Native MCP support
-Minimal integration effort
-Strong autonomous orchestration
-Built-in recovery mechanisms
+- Native MCP support
+- Minimal integration effort
+- Strong autonomous orchestration
+- Built-in recovery mechanisms
 
 **Weakness**
+- Less transparent internal reasoning
+- Less deterministic control
 
-Less transparent internal reasoning
-Less deterministic control
+---
 
 ## LangChain
 
@@ -31,16 +31,16 @@ Its strength lies in extensibility and integration breadth rather than orchestra
 Recovery is not implicit — it must be engineered explicitly.
 
 **Strengths**
-
-Extremely flexible
-Strong RAG ecosystem
-Large community support
+- Extremely flexible
+- Strong RAG ecosystem
+- Large community support
 
 **Weakness**
+- No native MCP
+- More glue code required
+- Recovery not built-in
 
-No native MCP
-More glue code required
-Recovery not built-in
+---
 
 ## LangGraph
 
@@ -52,14 +52,14 @@ It excels in multi-stage workflows where branching logic and traceability matter
 The tradeoff is architectural overhead and reduced autonomy — recovery and adaptation are design-time concerns rather than runtime emergent behavior.
 
 **Strengths**
-
-Deterministic execution
-State-machine architecture
-Excellent for multi-step workflows
+- Deterministic execution
+- State-machine architecture
+- Excellent for multi-step workflows
 
 **Weakness**
+- Higher architectural complexity
 
-Higher architectural complexity
+---
 
 ## GoogleADK
 
@@ -69,14 +69,12 @@ It introduces structured execution primitives but remains less flexible than Lan
 It sits between autonomy and governance.
 
 **Strengths**
-
-Strong session and state model
-Structured orchestration
+- Strong session and state model
+- Structured orchestration
 
 **Weakness**
-
-Heavier setup
-Less flexible than LangChain
+- Heavier setup
+- Less flexible than LangChain
 
 ### Multi Agent Interaction and Standardization Efforts:
 
@@ -105,6 +103,7 @@ MCP -  standardizes tool communication.
 A2A - standardizes agent communication.
 Agent Protocol - generalizes structured agent interaction patterns.
 
+---
 
 ## OpenAI Agent SDK
 
@@ -113,20 +112,15 @@ It enforces strict schema compliance, which improves reliability but increases i
 Its session abstraction is clean and production-oriented, but orchestration remains largely model-driven rather than graph-driven.
 
 **Strengths**
-
-Clean structured tool system
-Strong session abstraction
-Strict schema governance
+- Clean structured tool system
+- Strong session abstraction
+- Strict schema governance
 
 **Weakness**
+- Schema rigidity
+- Limited deterministic control
 
-Schema rigidity
-Limited deterministic control
-
-
-
-
-
+---
 
 **High Autonomy**
 
