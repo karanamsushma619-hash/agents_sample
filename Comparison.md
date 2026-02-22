@@ -122,7 +122,7 @@ Its session abstraction is clean and production-oriented, but orchestration rema
 
 ---
 
-##**High Autonomy**
+## **High Autonomy**
 
 What it means:
 The agent makes more decisions on its own during runtime, with minimal hard-coded flow control.
@@ -142,7 +142,7 @@ Adjusting plans mid-execution
 High autonomy = faster innovation, lower engineering effort, but slightly higher unpredictability risk.
 Claude Agent SDK leans toward high autonomy.
 
-##**Low Autonomy**
+## **Low Autonomy**
 
 What it means:
 The agent follows predefined execution paths with limited runtime decision freedom.
@@ -155,7 +155,7 @@ The agent follows predefined execution paths with limited runtime decision freed
 Low autonomy = safer, more predictable, but less adaptive.
 LangGraph (when tightly designed) can operate this way.
 
-##**High Control**
+## **High Control**
 
 What it means:
 Developers explicitly define how the agent moves from one step to another.
@@ -175,7 +175,7 @@ This includes:
 High control = better auditability and regulatory readiness.
 LangGraph strongly represents high control.
 
-##**Low Control**
+## **Low Control**
 
 What it means:
 Execution flow is primarily decided by the model at runtime rather than predefined logic.
@@ -188,7 +188,7 @@ Execution flow is primarily decided by the model at runtime rather than predefin
 Low control = faster to build, but harder to guarantee exact execution paths.
 Claude is lower control but higher autonomy.
 
-##**Structured Autonomy**
+## **Structured Autonomy**
 
 This is a hybrid concept.
 
@@ -209,7 +209,7 @@ It has:
 Structured autonomy = balance between innovation and enterprise discipline.
 Google ADK fits here.
 
-##**Governed Execution**
+## **Governed Execution**
 
 What it means:
 The agent operates under strict execution contracts and validation rules.
@@ -228,7 +228,7 @@ This includes:
 Governed execution = production safety, lower operational risk.
 OpenAI Agents SDK represents this model strongly.
 
-##**Flexibility**
+## **Flexibility**
 
 What it means:
 How easily the framework can integrate new components, tools, databases, APIs, memory layers, and workflows.
