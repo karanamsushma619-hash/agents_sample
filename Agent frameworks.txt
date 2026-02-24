@@ -1,0 +1,24 @@
+​The biggest challenge in this space isn't the LLM itself—it’s how we handle the tension between Planning Autonomy and Deterministic Control.
+​Think of it this way:
+​High Autonomy means the agent makes more decisions at runtime—deciding which tool to call and adjusting plans mid-execution.
+​High Control means we, as developers, explicitly define the path—using state machines and branching logic to ensure the agent doesn't go off the rails.
+​Today, I’ll walk you through five major frameworks and how they fit onto this spectrum."
+​Section 1: The Autonomous Orchestrators (1.5 Minutes)
+​"Let’s start with the frameworks that lean into autonomy: Claude Agent SDK and OpenAI Agents SDK.
+​Claude Agent SDK is built for exploration and speed. Its standout feature is its native support for MCP (Model Context Protocol). During execution, Claude is remarkably adaptive. If a tool fails, it doesn't just crash; it triggers an internal recovery loop to retry or revise its plan without us having to write explicit failure handling. It’s powerful, but the trade-off is that its internal reasoning is less transparent.
+​On the other hand, we have the OpenAI Agents SDK, which represents Governed Execution. It prioritizes strict schema compliance—it’s very rigid about how tools are called. This increases integration friction, but it gives you a clean, production-oriented system with high reliability for enterprise apps."
+​Section 2: The Architect’s Choice (1.5 Minutes)
+​"Now, if you need total control or maximum flexibility, you look at LangChain and LangGraph.
+​LangChain is our 'Swiss Army Knife.' It has the strongest ecosystem for RAG and modular memory. However, it’s 'composability-first,' meaning the orchestration is largely up to us. Recovery isn’t built-in; you have to engineer it. It’s the most flexible, but it requires the most 'glue code'.
+​If LangChain is a toolbox, LangGraph is a blueprint. It uses a state-machine architecture. Instead of the LLM guessing the next step, you define the nodes and edges. This makes execution 100% deterministic and auditable. If you’re building a regulated workflow where you need to know exactly why a decision was made, LangGraph is the gold standard."
+​Section 3: The Middle Ground & Implementation (1 Minute)
+​"Sitting right in the middle is Google ADK, which focuses on Structured Autonomy. It has a much stronger session and state model than the others. It allows the agent to be autonomous but within 'digital fences' or defined structural boundaries.
+​From a code perspective, as you can see in our documentation:
+​Claude is lean: you just need an async context and a query function.
+​Google ADK is more involved: you’re setting up a session_service, a runner, and specific lifecycle controls."
+​Conclusion: The Future of A2A (1 Minute)
+​"To wrap up, the ecosystem is moving toward Agent-to-Agent (A2A) communication. We are starting to see agents not just as isolated tools, but as networked nodes that can delegate tasks to each other.
+​Standardization is the next frontier.
+​MCP standardizes how agents talk to tools.
+​A2A standardizes how agents talk to each other.
+​Agent Protocol is the 'HTTP' that will unify all of this.
