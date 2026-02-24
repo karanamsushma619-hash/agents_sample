@@ -12,7 +12,6 @@ An agent without memory is just a function call. It executes a task and immediat
 ## 2. Types of Memory in Agentic AI
 Just like the human brain, AI agents utilize different "storage buckets" depending on retention needs.
 
-[attachment_0](attachment)
 
 ### A. Short-Term Memory (Working Memory)
 * **What it is:** The agent's current Context Window.
